@@ -51,3 +51,15 @@ También incorporé una pantalla de título/login con estética RPG cyberpunk. S
 Uno de los desafíos más importantes fue manejar la asincronía sin romper la sensación de juego. Para eso implementé mutaciones optimistas: cuando completo una misión, creo un hábito o lo elimino, la UI responde inmediatamente antes de que el servidor confirme la operación. Si Supabase falla, muestro un toast rojo de error y revierto la acción cuando corresponde. Esa decisión mantiene el "game feel" fluido sin ignorar la integridad de los datos.
 
 El siguiente paso será crear el schema real en Supabase con RLS, asociar cada fila al usuario autenticado y empezar a preparar una migración hacia stores más especializados si el estado sigue creciendo. A partir de acá LifeRPG ya tiene la base para convertirse en una app persistente, multiusuario y lista para evolucionar hacia misiones diarias, historial e inventario.
+
+## Sprint 4: Batallas contra Jefes (Sub-tareas y Datos Relacionales)
+
+En este sprint empecé a transformar LifeRPG en algo más profundo que un tracker de hábitos diarios. Implementé el sistema de Boss Fights: proyectos grandes representados como jefes con HP, recompensa masiva de XP y una lista de subtareas que funcionan como ataques.
+
+El desafío técnico principal fue manejar estado anidado en React sin mutar datos directamente. Cada boss tiene subtasks propias, y al completar una subtarea necesito actualizar dos niveles al mismo tiempo: marcar ese ataque como completado y descontar su daño del `currentHp` del jefe padre. Para resolverlo trabajé con copias inmutables, mapeando el arreglo de bosses y luego el arreglo interno de subtareas.
+
+A nivel de diseño, la Boss Arena cambia el tono visual del dashboard. Las misiones comunes siguen siendo acciones rápidas, pero un jefe se siente como una amenaza: barra de vida grande, colores carmesí, daño flotante y alerta de victoria al derrotarlo. Esto aporta una capa emocional que una simple lista de tareas no tiene.
+
+El valor UX de este sprint está en convertir proyectos largos en combates visibles. En vez de ver "Entregar Tesis" como una tarea enorme y abstracta, ahora puedo descomponerla en ataques concretos: escribir la introducción, ordenar el marco teórico, procesar resultados y hacer la entrega final. Cada avance baja la vida del jefe y hace que el progreso se sienta físico.
+
+Por ahora dejé esta lógica mockeada con `useState`, pensando en que más adelante los bosses y subtareas puedan persistirse en Supabase como datos relacionales. El siguiente paso natural será crear tablas para bosses y boss_subtasks, conectarlas al usuario autenticado y mantener esta misma sensación de combate con datos reales.
