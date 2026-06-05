@@ -27,3 +27,15 @@ Sumé Framer Motion para que el dashboard tenga respuesta visual inmediata: anim
 Para el Sprint 2, el siguiente paso lógico es migrar el estado local a Zustand y separar la lógica de progreso en un store reutilizable. También quiero sumar creación real de hábitos, categorías, rachas, recompensas desbloqueables y persistencia local o en base de datos.
 
 Después de eso, el sistema debería empezar a incluir misiones diarias, historial de progreso, inventario o recompensas cosméticas, y una capa de balance para que la progresión se sienta motivadora sin volverse trivial.
+
+## Sprint 2: El Poder de la Personalización (CRUD Local)
+
+En este sprint di un paso clave para que LifeRPG empiece a sentirse como una herramienta viva y no solo como una maqueta visual. Pasé de trabajar con una lista estática de acciones a manejar un conjunto dinámico de misiones en estado local con `useState`, lo que me permitió crear y eliminar hábitos directamente desde la interfaz.
+
+El cambio más importante fue convertir el Quest Log en un sistema CRUD local. Ahora puedo forjar nuevas misiones con nombre personalizado, elegir qué atributo mejoran y definir su dificultad, que a su vez determina la cantidad de XP que entregan. También agregué la posibilidad de abandonar misiones desde cada tarjeta, cuidando que ese click no active accidentalmente la recompensa del hábito.
+
+A nivel técnico, el desafío estuvo en coordinar varios estados de React al mismo tiempo: la colección de hábitos, la apertura y cierre del modal, los campos controlados del formulario y la validación mínima del nombre de la misión. Mantener todo en el cliente con `useState` sigue siendo una decisión consciente para este MVP, porque me permite iterar rápido antes de mover la lógica a una capa de estado más robusta.
+
+También cuidé que la interfaz no perdiera identidad. El modal fue diseñado como una ventana de sistema dentro de un RPG cyberpunk: fondo oscuro translúcido, `backdrop-blur`, bordes neón, sombras intensas y controles con foco luminoso. La creación de hábitos tenía que sentirse como "forjar una misión", no como llenar un formulario administrativo.
+
+El próximo paso natural para el Sprint 3 será persistir estas misiones en una base de datos, probablemente con Supabase. Eso va a permitir que los hábitos personalizados sobrevivan al refresh, se asocien a un usuario real y empiecen a formar parte de un progreso duradero dentro del juego.
