@@ -39,3 +39,15 @@ A nivel técnico, el desafío estuvo en coordinar varios estados de React al mis
 También cuidé que la interfaz no perdiera identidad. El modal fue diseñado como una ventana de sistema dentro de un RPG cyberpunk: fondo oscuro translúcido, `backdrop-blur`, bordes neón, sombras intensas y controles con foco luminoso. La creación de hábitos tenía que sentirse como "forjar una misión", no como llenar un formulario administrativo.
 
 El próximo paso natural para el Sprint 3 será persistir estas misiones en una base de datos, probablemente con Supabase. Eso va a permitir que los hábitos personalizados sobrevivan al refresh, se asocien a un usuario real y empiecen a formar parte de un progreso duradero dentro del juego.
+
+## Sprint 3: Guardando la Partida (Supabase & Cloud)
+
+En este sprint llevé LifeRPG de un estado efímero en memoria a una experiencia con guardado real de partida. Hasta ahora, el progreso del jugador y sus misiones vivían solamente dentro del cliente; al refrescar la página, todo volvía al punto inicial. Con Supabase empecé a construir la capa cloud que permite autenticar usuarios, cargar sus datos y persistir sus avances.
+
+Elegí Supabase porque encaja muy bien con la velocidad que necesita este MVP: autenticación integrada, una base Postgres flexible y una API JavaScript directa para leer y mutar datos desde el cliente. Dejé definidos los placeholders de tablas `life_rpg_profiles` y `life_rpg_habits`, separando el perfil del jugador de sus misiones para que el modelo pueda crecer sin mezclar responsabilidades.
+
+También incorporé una pantalla de título/login con estética RPG cyberpunk. Si el usuario no está autenticado, no ve el dashboard: primero debe entrar o crear su save slot. Al iniciar sesión, el sistema sincroniza nivel, XP, XP necesaria, atributos y misiones desde Supabase, mostrando un estado de carga tipo terminal mientras se recuperan los datos.
+
+Uno de los desafíos más importantes fue manejar la asincronía sin romper la sensación de juego. Para eso implementé mutaciones optimistas: cuando completo una misión, creo un hábito o lo elimino, la UI responde inmediatamente antes de que el servidor confirme la operación. Si Supabase falla, muestro un toast rojo de error y revierto la acción cuando corresponde. Esa decisión mantiene el "game feel" fluido sin ignorar la integridad de los datos.
+
+El siguiente paso será crear el schema real en Supabase con RLS, asociar cada fila al usuario autenticado y empezar a preparar una migración hacia stores más especializados si el estado sigue creciendo. A partir de acá LifeRPG ya tiene la base para convertirse en una app persistente, multiusuario y lista para evolucionar hacia misiones diarias, historial e inventario.

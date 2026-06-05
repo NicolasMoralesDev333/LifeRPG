@@ -1,7 +1,8 @@
 "use client";
 
+import { createClient } from "@supabase/supabase-js";
 import { AnimatePresence, motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
   Battery,
@@ -12,16 +13,33 @@ import {
   Dumbbell,
   Gauge,
   HeartPulse,
+  KeyRound,
+  LogOut,
+  Mail,
   MessageCircle,
   Moon,
   Plus,
   Save,
   Shield,
   Sparkles,
+  Terminal,
   Trash2,
   X,
   Zap,
 } from "lucide-react";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
+const supabase = hasSupabaseConfig
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
+
+// Supabase placeholders:
+// life_rpg_profiles: user_id uuid PK, level int, xp int, xp_needed int, stats jsonb, updated_at timestamptz
+// life_rpg_habits: id text PK, user_id uuid, label text, stat text, xp int, created_at timestamptz
+const PROFILE_TABLE = "life_rpg_profiles";
+const HABITS_TABLE = "life_rpg_habits";
 
 const INITIAL_STATS = {
   str: 10,
@@ -29,6 +47,13 @@ const INITIAL_STATS = {
   vit: 10,
   cha: 10,
   agi: 10,
+};
+
+const INITIAL_PLAYER = {
+  level: 1,
+  xp: 0,
+  xpNeeded: 100,
+  stats: INITIAL_STATS,
 };
 
 const STAT_CONFIG = [
@@ -164,6 +189,11 @@ const INITIAL_MISSION_DRAFT = {
   difficulty: "medium",
 };
 
+const INITIAL_AUTH_FORM = {
+  email: "",
+  password: "",
+};
+
 function calculateLevelProgress(totalXp, currentNeeded) {
   let nextXp = totalXp;
   let nextNeeded = currentNeeded;
@@ -189,22 +219,104 @@ function findDifficultyConfig(difficultyKey) {
   );
 }
 
+function createClientId(prefix = "habit") {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function decorateHabit(row) {
+  const statConfig = findStatConfig(row.stat);
+
+  return {
+    id: row.id,
+    label: row.label,
+    stat: row.stat,
+    xp: Number(row.xp),
+    Icon: statConfig.Icon,
+    accent: statConfig.bar,
+    border: statConfig.border,
+    hoverGlow: statConfig.actionHoverGlow,
+  };
+}
+
+function buildHabitRow(userId, habit) {
+  return {
+    id: habit.id,
+    user_id: userId,
+    label: habit.label,
+    stat: habit.stat,
+    xp: habit.xp,
+    created_at: new Date().toISOString(),
+  };
+}
+
+function normalizePlayerProfile(profile) {
+  if (!profile) {
+    return INITIAL_PLAYER;
+  }
+
+  return {
+    level: Number(profile.level ?? INITIAL_PLAYER.level),
+    xp: Number(profile.xp ?? INITIAL_PLAYER.xp),
+    xpNeeded: Number(profile.xp_needed ?? INITIAL_PLAYER.xpNeeded),
+    stats: {
+      ...INITIAL_STATS,
+      ...(profile.stats ?? {}),
+    },
+  };
+}
+
+function buildProfileRow(userId, player) {
+  return {
+    user_id: userId,
+    level: player.level,
+    xp: player.xp,
+    xp_needed: player.xpNeeded,
+    stats: player.stats,
+    updated_at: new Date().toISOString(),
+  };
+}
+
 export default function LifeRPGDashboard() {
-  const [level, setLevel] = useState(1);
-  const [xp, setXp] = useState(0);
-  const [xpNeeded, setXpNeeded] = useState(100);
-  const [stats, setStats] = useState(INITIAL_STATS);
-  const [habits, setHabits] = useState(INITIAL_HABITS);
+  const [session, setSession] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+  const [authMode, setAuthMode] = useState("login");
+  const [authForm, setAuthForm] = useState(INITIAL_AUTH_FORM);
+  const [authError, setAuthError] = useState("");
+  const [authInfo, setAuthInfo] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [player, setPlayer] = useState(INITIAL_PLAYER);
+  const [habits, setHabits] = useState([]);
   const [rewardBursts, setRewardBursts] = useState([]);
-  const [lastAction, setLastAction] = useState("Sistema online");
+  const [lastAction, setLastAction] = useState("Sistema offline");
   const [isForgeModalOpen, setIsForgeModalOpen] = useState(false);
   const [missionDraft, setMissionDraft] = useState(INITIAL_MISSION_DRAFT);
   const [formError, setFormError] = useState("");
+  const [toast, setToast] = useState(null);
 
+  const userId = session?.user?.id;
+  const userEmail = session?.user?.email ?? "Jugador conectado";
+  const { level, xp, xpNeeded, stats } = player;
   const xpPercent = Math.min((xp / xpNeeded) * 100, 100);
   const totalPower = Object.values(stats).reduce((sum, value) => sum + value, 0);
   const selectedStat = findStatConfig(missionDraft.stat);
   const selectedDifficulty = findDifficultyConfig(missionDraft.difficulty);
+
+  const showErrorToast = useCallback((message) => {
+    const toastId = createClientId("toast");
+
+    setToast({ id: toastId, message });
+
+    window.setTimeout(() => {
+      setToast((currentToast) =>
+        currentToast?.id === toastId ? null : currentToast,
+      );
+    }, 3600);
+  }, []);
 
   const statRows = useMemo(
     () =>
@@ -216,25 +328,240 @@ export default function LifeRPGDashboard() {
     [stats],
   );
 
-  const handleAction = (statKey, xpGain, actionLabel) => {
-    const { nextXp, nextNeeded, levelsGained } = calculateLevelProgress(
-      xp + xpGain,
-      xpNeeded,
-    );
-    const rewardId = `${Date.now()}-${statKey}-${xpGain}`;
+  const persistPlayer = useCallback(
+    async (nextPlayer) => {
+      if (!supabase || !userId) {
+        showErrorToast("Supabase no está configurado para guardar la partida.");
+        return false;
+      }
 
-    setStats((currentStats) => ({
-      ...currentStats,
-      [statKey]: currentStats[statKey] + 1,
-    }));
-    setXp(nextXp);
-    setXpNeeded(nextNeeded);
-    setLastAction(`${actionLabel} +${xpGain} XP`);
+      const { error } = await supabase
+        .from(PROFILE_TABLE)
+        .upsert(buildProfileRow(userId, nextPlayer), {
+          onConflict: "user_id",
+        });
 
-    if (levelsGained > 0) {
-      setLevel((currentLevel) => currentLevel + levelsGained);
+      if (error) {
+        showErrorToast("Error de conexión: no se pudo guardar el progreso.");
+        return false;
+      }
+
+      return true;
+    },
+    [showErrorToast, userId],
+  );
+
+  const syncPlayerData = useCallback(
+    async (nextUserId) => {
+      if (!supabase) {
+        showErrorToast("Faltan las variables NEXT_PUBLIC_SUPABASE_*.");
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+
+      try {
+        const [profileResponse, habitsResponse] = await Promise.all([
+          supabase
+            .from(PROFILE_TABLE)
+            .select("level,xp,xp_needed,stats")
+            .eq("user_id", nextUserId)
+            .maybeSingle(),
+          supabase
+            .from(HABITS_TABLE)
+            .select("id,label,stat,xp,created_at")
+            .eq("user_id", nextUserId)
+            .order("created_at", { ascending: true }),
+        ]);
+
+        if (profileResponse.error) {
+          throw profileResponse.error;
+        }
+
+        if (habitsResponse.error) {
+          throw habitsResponse.error;
+        }
+
+        const nextPlayer = normalizePlayerProfile(profileResponse.data);
+        let remoteHabitRows = habitsResponse.data ?? [];
+
+        if (!profileResponse.data) {
+          const { error } = await supabase
+            .from(PROFILE_TABLE)
+            .insert(buildProfileRow(nextUserId, nextPlayer));
+
+          if (error) {
+            throw error;
+          }
+        }
+
+        if (remoteHabitRows.length === 0) {
+          const starterRows = INITIAL_HABITS.map((habit) =>
+            buildHabitRow(nextUserId, {
+              ...habit,
+              id: createClientId("starter"),
+            }),
+          );
+
+          const { data, error } = await supabase
+            .from(HABITS_TABLE)
+            .insert(starterRows)
+            .select("id,label,stat,xp,created_at");
+
+          if (error) {
+            throw error;
+          }
+
+          remoteHabitRows = data ?? starterRows;
+        }
+
+        setPlayer(nextPlayer);
+        setHabits(remoteHabitRows.map(decorateHabit));
+        setLastAction("Partida sincronizada");
+      } catch {
+        setPlayer(INITIAL_PLAYER);
+        setHabits(INITIAL_HABITS);
+        setLastAction("Modo fallback local");
+        showErrorToast(
+          "No pude sincronizar la nube. Cargué un estado local temporal.",
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [showErrorToast],
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!supabase) {
+      setAuthError("Faltan NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+      setIsAuthLoading(false);
+      return undefined;
     }
 
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!isMounted) {
+        return;
+      }
+
+      if (error) {
+        showErrorToast("No pude leer la sesión de Supabase.");
+      }
+
+      setSession(data.session ?? null);
+      setIsLoading(Boolean(data.session));
+      setIsAuthLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setIsLoading(Boolean(nextSession));
+      setAuthError("");
+      setAuthInfo("");
+
+      if (!nextSession) {
+        setPlayer(INITIAL_PLAYER);
+        setHabits([]);
+        setLastAction("Sistema offline");
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [showErrorToast]);
+
+  useEffect(() => {
+    if (!userId) {
+      setIsLoading(false);
+      return;
+    }
+
+    syncPlayerData(userId);
+  }, [syncPlayerData, userId]);
+
+  const handleAuthSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!supabase) {
+      setAuthError("Configura Supabase antes de iniciar la partida.");
+      return;
+    }
+
+    setAuthError("");
+    setAuthInfo("");
+    setIsAuthSubmitting(true);
+
+    const credentials = {
+      email: authForm.email.trim(),
+      password: authForm.password,
+    };
+
+    try {
+      const response =
+        authMode === "login"
+          ? await supabase.auth.signInWithPassword(credentials)
+          : await supabase.auth.signUp(credentials);
+
+      if (response.error) {
+        throw response.error;
+      }
+
+      if (authMode === "register" && !response.data.session) {
+        setAuthInfo("Cuenta creada. Revisá tu email para activar el acceso.");
+      } else {
+      setAuthInfo("Acceso concedido. Cargando partida...");
+      }
+
+      setSession(response.data.session ?? null);
+      setIsLoading(Boolean(response.data.session));
+    } catch (error) {
+      setAuthError(error.message ?? "No pude autenticar al jugador.");
+    } finally {
+      setIsAuthSubmitting(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (!supabase) {
+      return;
+    }
+
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      showErrorToast("No pude cerrar la sesión.");
+      return;
+    }
+
+    setSession(null);
+  };
+
+  const handleAction = (statKey, xpGain, actionLabel) => {
+    const previousPlayer = player;
+    const { nextXp, nextNeeded, levelsGained } = calculateLevelProgress(
+      player.xp + xpGain,
+      player.xpNeeded,
+    );
+    const nextPlayer = {
+      level: player.level + levelsGained,
+      xp: nextXp,
+      xpNeeded: nextNeeded,
+      stats: {
+        ...player.stats,
+        [statKey]: player.stats[statKey] + 1,
+      },
+    };
+    const rewardId = `${Date.now()}-${statKey}-${xpGain}`;
+
+    setPlayer(nextPlayer);
+    setLastAction(`${actionLabel} +${xpGain} XP`);
     setRewardBursts((currentBursts) => [
       ...currentBursts.slice(-3),
       {
@@ -251,6 +578,13 @@ export default function LifeRPGDashboard() {
         currentBursts.filter((burst) => burst.id !== rewardId),
       );
     }, 1300);
+
+    persistPlayer(nextPlayer).then((wasSaved) => {
+      if (!wasSaved) {
+        setPlayer(previousPlayer);
+        setLastAction("Progreso revertido por error de sync");
+      }
+    });
   };
 
   const openForgeModal = () => {
@@ -275,11 +609,15 @@ export default function LifeRPGDashboard() {
       return;
     }
 
+    if (!supabase || !userId) {
+      showErrorToast("No hay sesión activa para guardar la misión.");
+      return;
+    }
+
     const statConfig = findStatConfig(missionDraft.stat);
     const difficultyConfig = findDifficultyConfig(missionDraft.difficulty);
-
     const newHabit = {
-      id: `custom-${Date.now()}`,
+      id: createClientId("habit"),
       label: missionName,
       stat: missionDraft.stat,
       xp: difficultyConfig.xp,
@@ -292,16 +630,238 @@ export default function LifeRPGDashboard() {
     setHabits((currentHabits) => [...currentHabits, newHabit]);
     setLastAction(`Misión forjada: ${missionName}`);
     closeForgeModal();
+
+    supabase
+      .from(HABITS_TABLE)
+      .insert(buildHabitRow(userId, newHabit))
+      .then(({ error }) => {
+        if (error) {
+          setHabits((currentHabits) =>
+            currentHabits.filter((habit) => habit.id !== newHabit.id),
+          );
+          showErrorToast("Error de conexión: no se pudo crear la misión.");
+        }
+      });
   };
 
   const handleDeleteHabit = (event, habitId, habitLabel) => {
     event.stopPropagation();
 
+    if (!supabase || !userId) {
+      showErrorToast("No hay sesión activa para abandonar la misión.");
+      return;
+    }
+
+    const habitToRestore = habits.find((habit) => habit.id === habitId);
+
     setHabits((currentHabits) =>
       currentHabits.filter((habit) => habit.id !== habitId),
     );
     setLastAction(`Misión abandonada: ${habitLabel}`);
+
+    supabase
+      .from(HABITS_TABLE)
+      .delete()
+      .eq("user_id", userId)
+      .eq("id", habitId)
+      .then(({ error }) => {
+        if (error && habitToRestore) {
+          setHabits((currentHabits) => [...currentHabits, habitToRestore]);
+          showErrorToast("Error de conexión: no se pudo borrar la misión.");
+        }
+      });
   };
+
+  const toastNode = (
+    <AnimatePresence>
+      {toast && (
+        <motion.div
+          key={toast.id}
+          initial={{ opacity: 0, y: 18, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 18, scale: 0.96 }}
+          className="fixed bottom-5 right-5 z-[70] max-w-sm border-2 border-rose-300 bg-rose-950/95 px-4 py-3 text-sm font-black uppercase text-rose-100 shadow-[0_0_36px_rgba(251,113,133,0.3)] [clip-path:polygon(0_0,calc(100%-12px)_0,100%_12px,100%_100%,12px_100%,0_calc(100%-12px))]"
+        >
+          {toast.message}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  if (isAuthLoading) {
+    return (
+      <main className="relative grid min-h-screen place-items-center overflow-hidden bg-slate-950 px-4 text-slate-100">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(34,211,238,0.18),transparent_34%),radial-gradient(circle_at_80%_80%,rgba(217,70,239,0.14),transparent_32%)]" />
+        <div className="relative border-2 border-cyan-300 bg-slate-950/[0.9] p-6 font-mono text-sm font-black uppercase text-cyan-100 shadow-[0_0_46px_rgba(34,211,238,0.22)] [clip-path:polygon(0_0,calc(100%-16px)_0,100%_16px,100%_100%,16px_100%,0_calc(100%-16px))]">
+          &gt; Inicializando núcleo de sesión...
+        </div>
+        {toastNode}
+      </main>
+    );
+  }
+
+  if (!session?.user) {
+    return (
+      <main className="relative min-h-screen overflow-hidden bg-slate-950 px-4 py-6 text-slate-100 sm:px-6">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(34,211,238,0.22),transparent_30%),radial-gradient(circle_at_82%_14%,rgba(217,70,239,0.18),transparent_34%),radial-gradient(circle_at_50%_90%,rgba(250,204,21,0.1),transparent_36%)]" />
+        <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:34px_34px]" />
+
+        <section className="relative mx-auto grid min-h-[calc(100vh-3rem)] w-full max-w-5xl place-items-center">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+            className="w-full max-w-2xl"
+          >
+            <div className="mb-6 text-center">
+              <p className="font-mono text-xs font-black uppercase text-cyan-200">
+                Save Slot / Cloud Sync
+              </p>
+              <h1 className="mt-3 text-5xl font-black uppercase leading-none text-white drop-shadow-[0_0_28px_rgba(34,211,238,0.45)] sm:text-7xl">
+                LifeRPG
+              </h1>
+              <p className="mt-3 font-mono text-sm font-black uppercase text-yellow-100 drop-shadow-[0_0_18px_rgba(250,204,21,0.5)]">
+                &gt; Press Start
+              </p>
+            </div>
+
+            <form
+              onSubmit={handleAuthSubmit}
+              className="relative overflow-hidden border-2 border-cyan-300 bg-slate-950/[0.9] p-5 shadow-[0_0_60px_rgba(34,211,238,0.22),0_0_80px_rgba(217,70,239,0.12)] [clip-path:polygon(0_0,calc(100%-20px)_0,100%_20px,100%_100%,20px_100%,0_calc(100%-20px))] sm:p-6"
+            >
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(34,211,238,0.16),transparent_34%,rgba(217,70,239,0.14)_72%,transparent)]" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-200" />
+
+              <div className="relative mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase text-slate-400">
+                    Terminal de acceso
+                  </p>
+                  <h2 className="text-2xl font-black uppercase text-white">
+                    {authMode === "login" ? "Cargar Partida" : "Nuevo Jugador"}
+                  </h2>
+                </div>
+                <Terminal className="h-9 w-9 text-cyan-200 drop-shadow-[0_0_12px_rgba(34,211,238,0.8)]" />
+              </div>
+
+              <div className="relative space-y-4">
+                <label className="block">
+                  <span className="mb-2 flex items-center gap-2 text-xs font-black uppercase text-slate-300">
+                    <Mail className="h-4 w-4 text-cyan-200" />
+                    Email
+                  </span>
+                  <input
+                    type="email"
+                    value={authForm.email}
+                    onChange={(event) =>
+                      setAuthForm((currentForm) => ({
+                        ...currentForm,
+                        email: event.target.value,
+                      }))
+                    }
+                    className="w-full border-2 border-slate-600 bg-slate-900 px-3 py-3 font-mono text-sm font-bold text-cyan-50 outline-none transition placeholder:text-slate-600 focus:border-cyan-300 focus:shadow-[0_0_24px_rgba(34,211,238,0.2)]"
+                    placeholder="player@liferpg.dev"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 flex items-center gap-2 text-xs font-black uppercase text-slate-300">
+                    <KeyRound className="h-4 w-4 text-fuchsia-200" />
+                    Contraseña
+                  </span>
+                  <input
+                    type="password"
+                    value={authForm.password}
+                    onChange={(event) =>
+                      setAuthForm((currentForm) => ({
+                        ...currentForm,
+                        password: event.target.value,
+                      }))
+                    }
+                    className="w-full border-2 border-slate-600 bg-slate-900 px-3 py-3 font-mono text-sm font-bold text-cyan-50 outline-none transition placeholder:text-slate-600 focus:border-fuchsia-300 focus:shadow-[0_0_24px_rgba(217,70,239,0.18)]"
+                    placeholder="••••••••"
+                  />
+                </label>
+
+                {authError && (
+                  <p className="border border-rose-300/60 bg-rose-500/10 px-3 py-2 text-sm font-bold text-rose-100">
+                    {authError}
+                  </p>
+                )}
+
+                {authInfo && (
+                  <p className="border border-cyan-300/60 bg-cyan-300/10 px-3 py-2 text-sm font-bold text-cyan-100">
+                    {authInfo}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isAuthSubmitting}
+                  className="w-full border-2 border-yellow-200 bg-yellow-200 px-4 py-3 text-sm font-black uppercase text-slate-950 shadow-[0_0_30px_rgba(250,204,21,0.3)] transition hover:bg-cyan-200 hover:shadow-[0_0_34px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isAuthSubmitting
+                    ? "> Autenticando..."
+                    : authMode === "login"
+                      ? "Start / Entrar"
+                      : "Crear Save Slot"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode((currentMode) =>
+                      currentMode === "login" ? "register" : "login",
+                    );
+                    setAuthError("");
+                    setAuthInfo("");
+                  }}
+                  className="w-full border border-cyan-300/50 bg-cyan-300/10 px-4 py-3 text-xs font-black uppercase text-cyan-100 transition hover:bg-cyan-300/20"
+                >
+                  {authMode === "login"
+                    ? "Crear nuevo jugador"
+                    : "Ya tengo una partida"}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </section>
+        {toastNode}
+      </main>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <main className="relative min-h-screen overflow-hidden bg-slate-950 px-4 py-6 text-slate-100 sm:px-6">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(34,211,238,0.18),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(217,70,239,0.15),transparent_30%)]" />
+        <section className="relative mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-5xl flex-col justify-center gap-5">
+          <div className="border-2 border-cyan-300 bg-slate-950/[0.9] p-5 font-mono text-sm font-black uppercase text-cyan-100 shadow-[0_0_46px_rgba(34,211,238,0.2)] [clip-path:polygon(0_0,calc(100%-16px)_0,100%_16px,100%_100%,16px_100%,0_calc(100%-16px))]">
+            &gt; Sincronizando datos neuronales...
+          </div>
+          <div className="grid gap-4 lg:grid-cols-[0.85fr_1.35fr]">
+            <div className="space-y-3 border-2 border-slate-700 bg-slate-950/[0.86] p-4">
+              {[0, 1, 2, 3, 4].map((item) => (
+                <div
+                  key={item}
+                  className="h-16 animate-pulse border border-cyan-300/20 bg-slate-900"
+                />
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[0, 1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="h-40 animate-pulse border-2 border-fuchsia-300/20 bg-slate-900"
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+        {toastNode}
+      </main>
+    );
+  }
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-950 px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
@@ -341,6 +901,9 @@ export default function LifeRPGDashboard() {
                   <span className="border border-fuchsia-300/50 bg-fuchsia-300/10 px-2 py-1 text-fuchsia-100">
                     {lastAction}
                   </span>
+                  <span className="max-w-full truncate border border-lime-300/50 bg-lime-300/10 px-2 py-1 font-mono text-lime-100">
+                    {userEmail}
+                  </span>
                 </div>
               </div>
             </div>
@@ -355,7 +918,17 @@ export default function LifeRPGDashboard() {
                     {xp} / {xpNeeded} XP
                   </p>
                 </div>
-                <Battery className="h-7 w-7 text-cyan-200 drop-shadow-[0_0_10px_rgba(34,211,238,0.75)]" />
+                <div className="flex items-center gap-2">
+                  <Battery className="h-7 w-7 text-cyan-200 drop-shadow-[0_0_10px_rgba(34,211,238,0.75)]" />
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    aria-label="Cerrar sesión"
+                    className="grid h-9 w-9 place-items-center border border-rose-300/70 bg-rose-500/[0.12] text-rose-100 transition hover:bg-rose-400/25 hover:text-white focus:outline-none focus:ring-2 focus:ring-rose-200 focus:ring-offset-2 focus:ring-offset-slate-950"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="relative h-9 overflow-hidden border-2 border-cyan-200/70 bg-slate-900 [clip-path:polygon(0_0,calc(100%-14px)_0,100%_14px,100%_100%,14px_100%,0_calc(100%-14px))]">
@@ -568,7 +1141,7 @@ export default function LifeRPGDashboard() {
                   </div>
 
                   <span className="w-fit border border-fuchsia-300/50 bg-fuchsia-300/10 px-2 py-1 font-mono text-xs font-black text-fuchsia-100">
-                    CUSTOM QUEST
+                    CLOUD QUEST
                   </span>
                 </div>
               </motion.button>
@@ -727,6 +1300,8 @@ export default function LifeRPGDashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {toastNode}
     </main>
   );
 }
