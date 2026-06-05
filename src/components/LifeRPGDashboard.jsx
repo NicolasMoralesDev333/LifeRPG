@@ -32,8 +32,15 @@ import {
   Zap,
 } from "lucide-react";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const runtimeEnv = {
+  ...((typeof process !== "undefined" && process.env) || {}),
+  ...((typeof import.meta !== "undefined" && import.meta.env) || {}),
+};
+const supabaseUrl =
+  runtimeEnv.NEXT_PUBLIC_SUPABASE_URL || runtimeEnv.VITE_SUPABASE_URL;
+const supabaseAnonKey =
+  runtimeEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  runtimeEnv.VITE_SUPABASE_ANON_KEY;
 const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
 const supabase = hasSupabaseConfig
   ? createClient(supabaseUrl, supabaseAnonKey)
@@ -44,6 +51,11 @@ const supabase = hasSupabaseConfig
 // life_rpg_habits: id text PK, user_id uuid, label text, stat text, xp int, created_at timestamptz
 const PROFILE_TABLE = "life_rpg_profiles";
 const HABITS_TABLE = "life_rpg_habits";
+const DEMO_USER_ID = "demo-user";
+const DEMO_CREDENTIALS = {
+  email: "demo@liferpg.local",
+  password: "demo1234",
+};
 
 const INITIAL_STATS = {
   str: 10,
@@ -373,6 +385,7 @@ export default function LifeRPGDashboard() {
   const [toast, setToast] = useState(null);
 
   const userId = session?.user?.id;
+  const isDemoSession = userId === DEMO_USER_ID;
   const userEmail = session?.user?.email ?? "Jugador conectado";
   const { level, xp, xpNeeded, stats } = player;
   const xpPercent = Math.min((xp / xpNeeded) * 100, 100);
@@ -411,6 +424,10 @@ export default function LifeRPGDashboard() {
   const persistPlayer = useCallback(
     async (nextPlayer) => {
       if (!supabase || !userId) {
+        if (isDemoSession) {
+          return true;
+        }
+
         showErrorToast("Supabase no está configurado para guardar la partida.");
         return false;
       }
@@ -428,7 +445,7 @@ export default function LifeRPGDashboard() {
 
       return true;
     },
-    [showErrorToast, userId],
+    [isDemoSession, showErrorToast, userId],
   );
 
   const syncPlayerData = useCallback(
@@ -566,16 +583,22 @@ export default function LifeRPGDashboard() {
       return;
     }
 
+    if (isDemoSession) {
+      setPlayer(INITIAL_PLAYER);
+      setHabits(INITIAL_HABITS);
+      setBosses(INITIAL_BOSSES);
+      setDamageBursts([]);
+      setVictoryBanner(null);
+      setLastAction("Modo demo local");
+      setIsLoading(false);
+      return;
+    }
+
     syncPlayerData(userId);
-  }, [syncPlayerData, userId]);
+  }, [isDemoSession, syncPlayerData, userId]);
 
   const handleAuthSubmit = async (event) => {
     event.preventDefault();
-
-    if (!supabase) {
-      setAuthError("Configura Supabase antes de iniciar la partida.");
-      return;
-    }
 
     setAuthError("");
     setAuthInfo("");
@@ -585,6 +608,31 @@ export default function LifeRPGDashboard() {
       email: authForm.email.trim(),
       password: authForm.password,
     };
+
+    if (!supabase) {
+      const isDemoLogin =
+        credentials.email === DEMO_CREDENTIALS.email &&
+        credentials.password === DEMO_CREDENTIALS.password;
+
+      if (!isDemoLogin) {
+        setAuthError(
+          `Sin Supabase configurado usá demo: ${DEMO_CREDENTIALS.email} / ${DEMO_CREDENTIALS.password}`,
+        );
+        setIsAuthSubmitting(false);
+        return;
+      }
+
+      setSession({
+        user: {
+          id: DEMO_USER_ID,
+          email: DEMO_CREDENTIALS.email,
+        },
+      });
+      setAuthInfo("Modo demo activado. Cargando dashboard local...");
+      setIsLoading(true);
+      setIsAuthSubmitting(false);
+      return;
+    }
 
     try {
       const response =
@@ -612,6 +660,15 @@ export default function LifeRPGDashboard() {
   };
 
   const handleSignOut = async () => {
+    if (isDemoSession) {
+      setSession(null);
+      setPlayer(INITIAL_PLAYER);
+      setHabits([]);
+      setBosses(INITIAL_BOSSES);
+      setLastAction("Sistema offline");
+      return;
+    }
+
     if (!supabase) {
       return;
     }
@@ -799,8 +856,13 @@ export default function LifeRPGDashboard() {
       return;
     }
 
-    if (!supabase || !userId) {
+    if (!userId) {
       showErrorToast("No hay sesión activa para guardar la misión.");
+      return;
+    }
+
+    if (!supabase && !isDemoSession) {
+      showErrorToast("Supabase no está configurado para guardar la misión.");
       return;
     }
 
@@ -821,6 +883,10 @@ export default function LifeRPGDashboard() {
     setLastAction(`Misión forjada: ${missionName}`);
     closeForgeModal();
 
+    if (isDemoSession || !supabase) {
+      return;
+    }
+
     supabase
       .from(HABITS_TABLE)
       .insert(buildHabitRow(userId, newHabit))
@@ -837,8 +903,13 @@ export default function LifeRPGDashboard() {
   const handleDeleteHabit = (event, habitId, habitLabel) => {
     event.stopPropagation();
 
-    if (!supabase || !userId) {
+    if (!userId) {
       showErrorToast("No hay sesión activa para abandonar la misión.");
+      return;
+    }
+
+    if (!supabase && !isDemoSession) {
+      showErrorToast("Supabase no está configurado para borrar la misión.");
       return;
     }
 
@@ -848,6 +919,10 @@ export default function LifeRPGDashboard() {
       currentHabits.filter((habit) => habit.id !== habitId),
     );
     setLastAction(`Misión abandonada: ${habitLabel}`);
+
+    if (isDemoSession || !supabase) {
+      return;
+    }
 
     supabase
       .from(HABITS_TABLE)
@@ -1007,6 +1082,13 @@ export default function LifeRPGDashboard() {
                   <p className="border border-cyan-300/60 bg-cyan-300/10 px-3 py-2 text-sm font-bold text-cyan-100">
                     {authInfo}
                   </p>
+                )}
+
+                {!hasSupabaseConfig && (
+                  <div className="border border-yellow-200/60 bg-yellow-200/10 px-3 py-2 font-mono text-xs font-black uppercase text-yellow-100">
+                    Demo local: {DEMO_CREDENTIALS.email} /{" "}
+                    {DEMO_CREDENTIALS.password}
+                  </div>
                 )}
 
                 <button
