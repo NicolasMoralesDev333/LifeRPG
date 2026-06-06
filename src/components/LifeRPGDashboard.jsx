@@ -9,10 +9,12 @@ import {
   BookOpen,
   Brain,
   Code2,
+  Coins,
   Crown,
   Dumbbell,
   Flame,
   Gauge,
+  Gift,
   HeartPulse,
   KeyRound,
   LogOut,
@@ -22,6 +24,7 @@ import {
   Plus,
   Save,
   Shield,
+  ShoppingBag,
   Skull,
   Sparkles,
   Swords,
@@ -47,8 +50,9 @@ const supabase = hasSupabaseConfig
   : null;
 
 // Supabase placeholders:
-// life_rpg_profiles: user_id uuid PK, level int, xp int, xp_needed int, stats jsonb, updated_at timestamptz
+// life_rpg_profiles: user_id uuid PK, level int, xp int, xp_needed int, cyber_credits int, stats jsonb, updated_at timestamptz
 // life_rpg_habits: id text PK, user_id uuid, label text, stat text, xp int, created_at timestamptz
+// life_rpg_rewards: id text PK, user_id uuid, name text, cost int, icon text, created_at timestamptz
 const PROFILE_TABLE = "life_rpg_profiles";
 const HABITS_TABLE = "life_rpg_habits";
 const DEMO_USER_ID = "demo-user";
@@ -69,6 +73,7 @@ const INITIAL_PLAYER = {
   level: 1,
   xp: 0,
   xpNeeded: 100,
+  cyberCredits: 120,
   stats: INITIAL_STATS,
 };
 
@@ -136,6 +141,7 @@ const INITIAL_HABITS = [
     label: "Entrenar",
     stat: "str",
     xp: 20,
+    credits: 12,
     Icon: Dumbbell,
     accent: "from-yellow-300 via-orange-500 to-rose-500",
     border: "border-yellow-300/70",
@@ -146,6 +152,7 @@ const INITIAL_HABITS = [
     label: "Programar",
     stat: "int",
     xp: 25,
+    credits: 16,
     Icon: Code2,
     accent: "from-cyan-300 via-sky-500 to-blue-600",
     border: "border-cyan-300/70",
@@ -156,6 +163,7 @@ const INITIAL_HABITS = [
     label: "Leer",
     stat: "cha",
     xp: 15,
+    credits: 9,
     Icon: BookOpen,
     accent: "from-fuchsia-400 via-pink-500 to-amber-300",
     border: "border-fuchsia-300/70",
@@ -166,6 +174,7 @@ const INITIAL_HABITS = [
     label: "Dormir",
     stat: "vit",
     xp: 18,
+    credits: 11,
     Icon: Moon,
     accent: "from-lime-300 via-emerald-400 to-teal-500",
     border: "border-lime-300/70",
@@ -176,6 +185,7 @@ const INITIAL_HABITS = [
     label: "Sprint",
     stat: "agi",
     xp: 22,
+    credits: 14,
     Icon: Zap,
     accent: "from-yellow-200 via-lime-300 to-green-400",
     border: "border-yellow-200/70",
@@ -186,6 +196,7 @@ const INITIAL_HABITS = [
     label: "Conectar",
     stat: "cha",
     xp: 16,
+    credits: 10,
     Icon: MessageCircle,
     accent: "from-pink-400 via-fuchsia-500 to-cyan-300",
     border: "border-pink-300/70",
@@ -200,6 +211,7 @@ const INITIAL_BOSSES = [
     totalHp: 320,
     currentHp: 320,
     rewardXp: 260,
+    rewardCredits: 180,
     Icon: Skull,
     isDefeated: false,
     subtasks: [
@@ -207,24 +219,28 @@ const INITIAL_BOSSES = [
         id: "thesis-intro",
         name: "Escribir Introducción",
         damage: 50,
+        credits: 25,
         isCompleted: false,
       },
       {
         id: "thesis-research",
         name: "Ordenar marco teórico",
         damage: 70,
+        credits: 32,
         isCompleted: false,
       },
       {
         id: "thesis-data",
         name: "Procesar resultados",
         damage: 90,
+        credits: 38,
         isCompleted: false,
       },
       {
         id: "thesis-final",
         name: "Revisión final y entrega",
         damage: 110,
+        credits: 45,
         isCompleted: false,
       },
     ],
@@ -235,6 +251,7 @@ const INITIAL_BOSSES = [
     totalHp: 240,
     currentHp: 240,
     rewardXp: 180,
+    rewardCredits: 130,
     Icon: Flame,
     isDefeated: false,
     subtasks: [
@@ -242,18 +259,21 @@ const INITIAL_BOSSES = [
         id: "portfolio-copy",
         name: "Reescribir casos de estudio",
         damage: 60,
+        credits: 28,
         isCompleted: false,
       },
       {
         id: "portfolio-ui",
         name: "Pulir responsive final",
         damage: 70,
+        credits: 34,
         isCompleted: false,
       },
       {
         id: "portfolio-deploy",
         name: "Deploy y revisión pública",
         damage: 110,
+        credits: 48,
         isCompleted: false,
       },
     ],
@@ -261,15 +281,41 @@ const INITIAL_BOSSES = [
 ];
 
 const DIFFICULTY_OPTIONS = [
-  { key: "easy", label: "Fácil", xp: 10 },
-  { key: "medium", label: "Media", xp: 20 },
-  { key: "hard", label: "Difícil", xp: 40 },
+  { key: "easy", label: "Fácil", xp: 10, credits: 8 },
+  { key: "medium", label: "Media", xp: 20, credits: 16 },
+  { key: "hard", label: "Difícil", xp: 40, credits: 32 },
 ];
 
 const INITIAL_MISSION_DRAFT = {
   name: "",
   stat: "str",
   difficulty: "medium",
+};
+
+const INITIAL_REWARDS = [
+  {
+    id: "reward-pc-hour",
+    name: "Jugar 1 hora en la PC",
+    cost: 120,
+    Icon: Gift,
+  },
+  {
+    id: "reward-movie-night",
+    name: "Noche de película",
+    cost: 180,
+    Icon: Trophy,
+  },
+  {
+    id: "reward-premium-coffee",
+    name: "Café premium sin culpa",
+    cost: 90,
+    Icon: Zap,
+  },
+];
+
+const INITIAL_REWARD_DRAFT = {
+  name: "",
+  cost: 140,
 };
 
 const INITIAL_AUTH_FORM = {
@@ -318,6 +364,7 @@ function decorateHabit(row) {
     label: row.label,
     stat: row.stat,
     xp: Number(row.xp),
+    credits: Number(row.credits ?? Math.max(6, Math.round(Number(row.xp) / 2))),
     Icon: statConfig.Icon,
     accent: statConfig.bar,
     border: statConfig.border,
@@ -345,6 +392,9 @@ function normalizePlayerProfile(profile) {
     level: Number(profile.level ?? INITIAL_PLAYER.level),
     xp: Number(profile.xp ?? INITIAL_PLAYER.xp),
     xpNeeded: Number(profile.xp_needed ?? INITIAL_PLAYER.xpNeeded),
+    cyberCredits: Number(
+      profile.cyber_credits ?? INITIAL_PLAYER.cyberCredits,
+    ),
     stats: {
       ...INITIAL_STATS,
       ...(profile.stats ?? {}),
@@ -358,6 +408,7 @@ function buildProfileRow(userId, player) {
     level: player.level,
     xp: player.xp,
     xp_needed: player.xpNeeded,
+    cyber_credits: player.cyberCredits,
     stats: player.stats,
     updated_at: new Date().toISOString(),
   };
@@ -375,19 +426,23 @@ export default function LifeRPGDashboard() {
   const [player, setPlayer] = useState(INITIAL_PLAYER);
   const [habits, setHabits] = useState([]);
   const [bosses, setBosses] = useState(INITIAL_BOSSES);
+  const [blackMarketRewards, setBlackMarketRewards] = useState(INITIAL_REWARDS);
   const [damageBursts, setDamageBursts] = useState([]);
   const [victoryBanner, setVictoryBanner] = useState(null);
   const [rewardBursts, setRewardBursts] = useState([]);
   const [lastAction, setLastAction] = useState("Sistema offline");
   const [isForgeModalOpen, setIsForgeModalOpen] = useState(false);
   const [missionDraft, setMissionDraft] = useState(INITIAL_MISSION_DRAFT);
+  const [rewardDraft, setRewardDraft] = useState(INITIAL_REWARD_DRAFT);
   const [formError, setFormError] = useState("");
+  const [rewardFormError, setRewardFormError] = useState("");
+  const [shakingRewardId, setShakingRewardId] = useState(null);
   const [toast, setToast] = useState(null);
 
   const userId = session?.user?.id;
   const isDemoSession = userId === DEMO_USER_ID;
   const userEmail = session?.user?.email ?? "Jugador conectado";
-  const { level, xp, xpNeeded, stats } = player;
+  const { level, xp, xpNeeded, stats, cyberCredits } = player;
   const xpPercent = Math.min((xp / xpNeeded) * 100, 100);
   const totalPower = Object.values(stats).reduce((sum, value) => sum + value, 0);
   const selectedStat = findStatConfig(missionDraft.stat);
@@ -399,10 +454,10 @@ export default function LifeRPGDashboard() {
     : 0;
   const isBossEnraged = bossHpPercent <= 50;
 
-  const showErrorToast = useCallback((message) => {
+  const showToast = useCallback((message, type = "error") => {
     const toastId = createClientId("toast");
 
-    setToast({ id: toastId, message });
+    setToast({ id: toastId, message, type });
 
     window.setTimeout(() => {
       setToast((currentToast) =>
@@ -410,6 +465,16 @@ export default function LifeRPGDashboard() {
       );
     }, 3600);
   }, []);
+
+  const showErrorToast = useCallback(
+    (message) => showToast(message, "error"),
+    [showToast],
+  );
+
+  const showSuccessToast = useCallback(
+    (message) => showToast(message, "success"),
+    [showToast],
+  );
 
   const statRows = useMemo(
     () =>
@@ -462,7 +527,7 @@ export default function LifeRPGDashboard() {
         const [profileResponse, habitsResponse] = await Promise.all([
           supabase
             .from(PROFILE_TABLE)
-            .select("level,xp,xp_needed,stats")
+            .select("level,xp,xp_needed,cyber_credits,stats")
             .eq("user_id", nextUserId)
             .maybeSingle(),
           supabase
@@ -519,6 +584,7 @@ export default function LifeRPGDashboard() {
       } catch {
         setPlayer(INITIAL_PLAYER);
         setHabits(INITIAL_HABITS);
+        setBlackMarketRewards(INITIAL_REWARDS);
         setLastAction("Modo fallback local");
         showErrorToast(
           "No pude sincronizar la nube. Cargué un estado local temporal.",
@@ -565,6 +631,7 @@ export default function LifeRPGDashboard() {
         setPlayer(INITIAL_PLAYER);
         setHabits([]);
         setBosses(INITIAL_BOSSES);
+        setBlackMarketRewards(INITIAL_REWARDS);
         setDamageBursts([]);
         setVictoryBanner(null);
         setLastAction("Sistema offline");
@@ -587,6 +654,7 @@ export default function LifeRPGDashboard() {
       setPlayer(INITIAL_PLAYER);
       setHabits(INITIAL_HABITS);
       setBosses(INITIAL_BOSSES);
+      setBlackMarketRewards(INITIAL_REWARDS);
       setDamageBursts([]);
       setVictoryBanner(null);
       setLastAction("Modo demo local");
@@ -665,6 +733,7 @@ export default function LifeRPGDashboard() {
       setPlayer(INITIAL_PLAYER);
       setHabits([]);
       setBosses(INITIAL_BOSSES);
+      setBlackMarketRewards(INITIAL_REWARDS);
       setLastAction("Sistema offline");
       return;
     }
@@ -683,87 +752,121 @@ export default function LifeRPGDashboard() {
     setSession(null);
   };
 
-  const handleAction = (statKey, xpGain, actionLabel) => {
-    const previousPlayer = player;
-    const { nextXp, nextNeeded, levelsGained } = calculateLevelProgress(
-      player.xp + xpGain,
-      player.xpNeeded,
-    );
-    const nextPlayer = {
-      level: player.level + levelsGained,
-      xp: nextXp,
-      xpNeeded: nextNeeded,
-      stats: {
-        ...player.stats,
-        [statKey]: player.stats[statKey] + 1,
-      },
-    };
-    const rewardId = `${Date.now()}-${statKey}-${xpGain}`;
+  const queueRewardBurst = useCallback(
+    ({
+      actionLabel,
+      xpGain = 0,
+      creditGain = 0,
+      detail,
+      levelsGained = 0,
+      duration = 1300,
+    }) => {
+      const rewardId = createClientId("reward-burst");
 
-    setPlayer(nextPlayer);
-    setLastAction(`${actionLabel} +${xpGain} XP`);
-    setRewardBursts((currentBursts) => [
-      ...currentBursts.slice(-3),
-      {
-        id: rewardId,
+      setRewardBursts((currentBursts) => [
+        ...currentBursts.slice(-3),
+        {
+          id: rewardId,
+          actionLabel,
+          xpGain,
+          creditGain,
+          detail,
+          levelsGained,
+        },
+      ]);
+
+      window.setTimeout(() => {
+        setRewardBursts((currentBursts) =>
+          currentBursts.filter((burst) => burst.id !== rewardId),
+        );
+      }, duration);
+    },
+    [],
+  );
+
+  const applyPlayerReward = useCallback(
+    ({
+      statKey,
+      xpGain = 0,
+      creditGain = 0,
+      actionLabel,
+      detail,
+      lastActionText,
+      duration = 1300,
+    }) => {
+      const previousPlayer = player;
+      const { nextXp, nextNeeded, levelsGained } = calculateLevelProgress(
+        player.xp + xpGain,
+        player.xpNeeded,
+      );
+      const nextPlayer = {
+        ...player,
+        level: player.level + levelsGained,
+        xp: nextXp,
+        xpNeeded: nextNeeded,
+        cyberCredits: Math.max(0, player.cyberCredits + creditGain),
+        stats: statKey
+          ? {
+              ...player.stats,
+              [statKey]: (player.stats[statKey] ?? 0) + 1,
+            }
+          : player.stats,
+      };
+
+      setPlayer(nextPlayer);
+      setLastAction(
+        lastActionText ??
+          `${actionLabel} +${xpGain} XP / +${creditGain} CR`,
+      );
+      queueRewardBurst({
         actionLabel,
         xpGain,
-        detail: `+1 ${statKey.toUpperCase()}`,
+        creditGain,
+        detail,
         levelsGained,
-      },
-    ]);
+        duration,
+      });
 
-    window.setTimeout(() => {
-      setRewardBursts((currentBursts) =>
-        currentBursts.filter((burst) => burst.id !== rewardId),
-      );
-    }, 1300);
+      persistPlayer(nextPlayer).then((wasSaved) => {
+        if (!wasSaved) {
+          setPlayer(previousPlayer);
+          setLastAction("Progreso revertido por error de sync");
+        }
+      });
 
-    persistPlayer(nextPlayer).then((wasSaved) => {
-      if (!wasSaved) {
-        setPlayer(previousPlayer);
-        setLastAction("Progreso revertido por error de sync");
-      }
+      return nextPlayer;
+    },
+    [persistPlayer, player, queueRewardBurst],
+  );
+
+  const handleAction = (statKey, xpGain, creditGain, actionLabel) => {
+    applyPlayerReward({
+      statKey,
+      xpGain,
+      creditGain,
+      actionLabel,
+      detail: `+1 ${statKey.toUpperCase()}`,
     });
   };
 
-  const grantBossReward = (rewardXp, bossName) => {
-    const previousPlayer = player;
-    const { nextXp, nextNeeded, levelsGained } = calculateLevelProgress(
-      player.xp + rewardXp,
-      player.xpNeeded,
-    );
-    const nextPlayer = {
-      ...player,
-      level: player.level + levelsGained,
-      xp: nextXp,
-      xpNeeded: nextNeeded,
-    };
-    const rewardId = `${Date.now()}-boss-${rewardXp}`;
+  const grantCyberCredits = (creditGain, actionLabel) => {
+    applyPlayerReward({
+      creditGain,
+      actionLabel,
+      detail: "LOOT",
+      lastActionText: `${actionLabel} +${creditGain} CR`,
+      duration: 1200,
+    });
+  };
 
-    setPlayer(nextPlayer);
-    setRewardBursts((currentBursts) => [
-      ...currentBursts.slice(-3),
-      {
-        id: rewardId,
-        actionLabel: bossName,
-        xpGain: rewardXp,
-        detail: "BOSS CLEAR",
-        levelsGained,
-      },
-    ]);
-
-    window.setTimeout(() => {
-      setRewardBursts((currentBursts) =>
-        currentBursts.filter((burst) => burst.id !== rewardId),
-      );
-    }, 1600);
-
-    persistPlayer(nextPlayer).then((wasSaved) => {
-      if (!wasSaved) {
-        setPlayer(previousPlayer);
-        setLastAction("Recompensa de jefe revertida por sync");
-      }
+  const grantBossReward = (rewardXp, bossName, rewardCredits = 0) => {
+    applyPlayerReward({
+      xpGain: rewardXp,
+      creditGain: rewardCredits,
+      actionLabel: bossName,
+      detail: "BOSS CLEAR",
+      lastActionText: `Jefe derrotado: ${bossName}`,
+      duration: 1600,
     });
   };
 
@@ -780,6 +883,9 @@ export default function LifeRPGDashboard() {
     const nextHp = Math.max(boss.currentHp - subtask.damage, 0);
     const isDefeated = nextHp <= 0;
     const damageId = `${Date.now()}-${bossId}-${subtaskId}`;
+    const attackCredits = Number(
+      subtask.credits ?? Math.max(8, Math.round(subtask.damage / 3)),
+    );
 
     setBosses((currentBosses) =>
       currentBosses.map((currentBoss) => {
@@ -817,20 +923,23 @@ export default function LifeRPGDashboard() {
 
     if (isDefeated) {
       const victoryId = createClientId("victory");
+      const victoryCredits = Number(boss.rewardCredits ?? 0) + attackCredits;
 
       setVictoryBanner({
         id: victoryId,
         bossName: boss.name,
         rewardXp: boss.rewardXp,
+        rewardCredits: victoryCredits,
       });
-      setLastAction(`Jefe derrotado: ${boss.name}`);
-      grantBossReward(boss.rewardXp, boss.name);
+      grantBossReward(boss.rewardXp, boss.name, victoryCredits);
 
       window.setTimeout(() => {
         setVictoryBanner((currentBanner) =>
           currentBanner?.id === victoryId ? null : currentBanner,
         );
       }, 4200);
+    } else {
+      grantCyberCredits(attackCredits, `Ataque: ${subtask.name}`);
     }
   };
 
@@ -873,6 +982,7 @@ export default function LifeRPGDashboard() {
       label: missionName,
       stat: missionDraft.stat,
       xp: difficultyConfig.xp,
+      credits: difficultyConfig.credits,
       Icon: statConfig.Icon,
       accent: statConfig.bar,
       border: statConfig.border,
@@ -937,6 +1047,78 @@ export default function LifeRPGDashboard() {
       });
   };
 
+  const handleCreateReward = (event) => {
+    event.preventDefault();
+
+    const rewardName = rewardDraft.name.trim();
+    const rewardCost = Number(rewardDraft.cost);
+
+    if (!rewardName) {
+      setRewardFormError("La recompensa necesita un nombre.");
+      return;
+    }
+
+    if (!Number.isFinite(rewardCost) || rewardCost <= 0) {
+      setRewardFormError("El costo debe ser mayor a 0 créditos.");
+      return;
+    }
+
+    const newReward = {
+      id: createClientId("reward"),
+      name: rewardName,
+      cost: Math.round(rewardCost),
+      Icon: Gift,
+    };
+
+    setBlackMarketRewards((currentRewards) => [...currentRewards, newReward]);
+    setRewardDraft(INITIAL_REWARD_DRAFT);
+    setRewardFormError("");
+    setLastAction(`Ítem registrado: ${rewardName}`);
+    showSuccessToast(`Nuevo ítem en Mercado Negro: ${rewardName}`);
+  };
+
+  const handleDeleteReward = (event, rewardId, rewardName) => {
+    event.stopPropagation();
+
+    setBlackMarketRewards((currentRewards) =>
+      currentRewards.filter((reward) => reward.id !== rewardId),
+    );
+    setLastAction(`Ítem retirado: ${rewardName}`);
+  };
+
+  const handleBuyReward = (reward) => {
+    if (cyberCredits < reward.cost) {
+      setShakingRewardId(reward.id);
+      setLastAction(`Créditos insuficientes para: ${reward.name}`);
+      showErrorToast("Créditos Insuficientes");
+
+      window.setTimeout(() => {
+        setShakingRewardId((currentId) =>
+          currentId === reward.id ? null : currentId,
+        );
+      }, 460);
+
+      return;
+    }
+
+    const previousPlayer = player;
+    const nextPlayer = {
+      ...player,
+      cyberCredits: player.cyberCredits - reward.cost,
+    };
+
+    setPlayer(nextPlayer);
+    setLastAction(`Gastaste ${reward.cost} CR en: ${reward.name}`);
+    showSuccessToast(`Recompensa Desbloqueada: ${reward.name}`);
+
+    persistPlayer(nextPlayer).then((wasSaved) => {
+      if (!wasSaved) {
+        setPlayer(previousPlayer);
+        setLastAction("Compra revertida por error de sync");
+      }
+    });
+  };
+
   const toastNode = (
     <AnimatePresence>
       {toast && (
@@ -945,7 +1127,11 @@ export default function LifeRPGDashboard() {
           initial={{ opacity: 0, y: 18, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 18, scale: 0.96 }}
-          className="fixed bottom-5 right-5 z-[70] max-w-sm border-2 border-rose-300 bg-rose-950/95 px-4 py-3 text-sm font-black uppercase text-rose-100 shadow-[0_0_36px_rgba(251,113,133,0.3)] [clip-path:polygon(0_0,calc(100%-12px)_0,100%_12px,100%_100%,12px_100%,0_calc(100%-12px))]"
+          className={`fixed bottom-5 right-5 z-[70] max-w-sm border-2 px-4 py-3 text-sm font-black uppercase shadow-[0_0_36px_rgba(251,113,133,0.3)] [clip-path:polygon(0_0,calc(100%-12px)_0,100%_12px,100%_100%,12px_100%,0_calc(100%-12px))] ${
+            toast.type === "success"
+              ? "border-lime-300 bg-emerald-950/95 text-lime-100 shadow-[0_0_36px_rgba(132,204,22,0.26)]"
+              : "border-rose-300 bg-rose-950/95 text-rose-100 shadow-[0_0_36px_rgba(251,113,133,0.3)]"
+          }`}
         >
           {toast.message}
         </motion.div>
@@ -971,6 +1157,9 @@ export default function LifeRPGDashboard() {
           </h2>
           <p className="mt-2 font-mono text-sm font-black uppercase text-cyan-100">
             +{victoryBanner.rewardXp} XP reclamados
+          </p>
+          <p className="mt-1 font-mono text-sm font-black uppercase text-lime-100">
+            +{victoryBanner.rewardCredits} CR capturados
           </p>
         </motion.div>
       )}
@@ -1194,6 +1383,10 @@ export default function LifeRPGDashboard() {
                   <span className="border border-cyan-300/50 bg-cyan-300/10 px-2 py-1 font-mono text-cyan-100">
                     POW {totalPower}
                   </span>
+                  <span className="inline-flex items-center gap-1 border border-yellow-200/60 bg-yellow-200/10 px-2 py-1 font-mono text-yellow-100">
+                    <Coins className="h-3.5 w-3.5" />
+                    {cyberCredits} CR
+                  </span>
                   <span className="border border-fuchsia-300/50 bg-fuchsia-300/10 px-2 py-1 text-fuchsia-100">
                     {lastAction}
                   </span>
@@ -1251,9 +1444,16 @@ export default function LifeRPGDashboard() {
                 transition={{ duration: 0.48, ease: "easeOut" }}
                 className="pointer-events-none absolute right-4 top-16 border-2 border-yellow-200 bg-slate-950 px-3 py-2 text-right shadow-[0_0_28px_rgba(250,204,21,0.3)] [clip-path:polygon(0_0,calc(100%-10px)_0,100%_10px,100%_100%,10px_100%,0_calc(100%-10px))]"
               >
-                <p className="font-mono text-sm font-black text-yellow-100">
-                  +{burst.xpGain} XP
-                </p>
+                {burst.xpGain > 0 && (
+                  <p className="font-mono text-sm font-black text-yellow-100">
+                    +{burst.xpGain} XP
+                  </p>
+                )}
+                {burst.creditGain > 0 && (
+                  <p className="font-mono text-sm font-black text-lime-100">
+                    +{burst.creditGain} CR
+                  </p>
+                )}
                 <p className="text-xs font-black uppercase text-cyan-100">
                   {burst.detail}
                 </p>
@@ -1361,7 +1561,12 @@ export default function LifeRPGDashboard() {
                       <button
                         type="button"
                         onClick={() =>
-                          handleAction(habit.stat, habit.xp, habit.label)
+                          handleAction(
+                            habit.stat,
+                            habit.xp,
+                            habit.credits,
+                            habit.label,
+                          )
                         }
                         className="relative h-full min-h-40 w-full p-4 text-left focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:ring-offset-2 focus:ring-offset-slate-950"
                       >
@@ -1392,6 +1597,10 @@ export default function LifeRPGDashboard() {
                             </span>
                             <span className="border border-yellow-200/50 bg-yellow-200/10 px-2 py-1 font-mono text-xs font-black text-yellow-100">
                               +{habit.xp} XP
+                            </span>
+                            <span className="inline-flex items-center gap-1 border border-lime-300/50 bg-lime-300/10 px-2 py-1 font-mono text-xs font-black text-lime-100">
+                              <Coins className="h-3.5 w-3.5" />
+                              +{habit.credits} CR
                             </span>
                           </div>
                         </div>
@@ -1517,6 +1726,10 @@ export default function LifeRPGDashboard() {
                   <span className="border border-yellow-200/60 bg-yellow-200/10 px-2 py-1 font-mono text-xs font-black text-yellow-100">
                     REWARD +{activeBoss.rewardXp} XP
                   </span>
+                  <span className="inline-flex items-center gap-1 border border-lime-300/60 bg-lime-300/10 px-2 py-1 font-mono text-xs font-black text-lime-100">
+                    <Coins className="h-3.5 w-3.5" />
+                    BOUNTY +{activeBoss.rewardCredits} CR
+                  </span>
                   <span className="border border-rose-300/60 bg-rose-500/10 px-2 py-1 font-mono text-xs font-black text-rose-100">
                     {activeBoss.subtasks.filter((subtask) => subtask.isCompleted).length}
                     /{activeBoss.subtasks.length} ATAQUES
@@ -1556,6 +1769,9 @@ export default function LifeRPGDashboard() {
                         <p className="font-mono text-xs font-black text-rose-200">
                           DAMAGE {subtask.damage}
                         </p>
+                        <p className="font-mono text-xs font-black text-lime-200">
+                          LOOT +{subtask.credits} CR
+                        </p>
                       </div>
                     </div>
                     <Swords className="h-5 w-5 shrink-0 text-rose-100 group-hover:text-yellow-100" />
@@ -1579,6 +1795,188 @@ export default function LifeRPGDashboard() {
               </span>
             </div>
           )}
+        </motion.section>
+
+        <motion.section
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.26, duration: 0.45, ease: "easeOut" }}
+          className="relative overflow-hidden border-2 border-yellow-200/80 bg-slate-950/[0.9] p-4 shadow-[0_0_48px_rgba(250,204,21,0.16),0_0_72px_rgba(132,204,22,0.08)] [clip-path:polygon(0_0,calc(100%-22px)_0,100%_22px,100%_100%,22px_100%,0_calc(100%-22px))] sm:p-5"
+        >
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(250,204,21,0.14),transparent_34%,rgba(34,197,94,0.12)_72%,transparent)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-yellow-200 via-lime-300 to-emerald-400" />
+
+          <div className="relative mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-xs font-black uppercase text-yellow-100">
+                <ShoppingBag className="h-4 w-4" />
+                Black Market
+              </p>
+              <h2 className="mt-1 text-2xl font-black uppercase text-white sm:text-3xl">
+                Mercado Negro
+              </h2>
+            </div>
+            <div className="inline-flex w-fit items-center gap-2 border-2 border-lime-300/70 bg-lime-300/10 px-3 py-2 font-mono text-sm font-black uppercase text-lime-100 shadow-[0_0_24px_rgba(132,204,22,0.18)]">
+              <Coins className="h-5 w-5" />
+              Saldo {cyberCredits} CR
+            </div>
+          </div>
+
+          <div className="relative grid gap-4 lg:grid-cols-[0.78fr_1.22fr]">
+            <form
+              onSubmit={handleCreateReward}
+              className="border-2 border-lime-300/50 bg-slate-900/70 p-4 [clip-path:polygon(0_0,calc(100%-14px)_0,100%_14px,100%_100%,14px_100%,0_calc(100%-14px))]"
+            >
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase text-slate-400">
+                    Contrabando
+                  </p>
+                  <h3 className="text-lg font-black uppercase text-white">
+                    Registrar Recompensa
+                  </h3>
+                </div>
+                <Gift className="h-8 w-8 text-lime-200 drop-shadow-[0_0_12px_rgba(132,204,22,0.7)]" />
+              </div>
+
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="mb-2 block text-xs font-black uppercase text-slate-300">
+                    Ítem
+                  </span>
+                  <input
+                    type="text"
+                    value={rewardDraft.name}
+                    onChange={(event) => {
+                      setRewardDraft((currentDraft) => ({
+                        ...currentDraft,
+                        name: event.target.value,
+                      }));
+                      setRewardFormError("");
+                    }}
+                    className="w-full border-2 border-slate-600 bg-slate-950 px-3 py-3 text-sm font-bold text-white outline-none transition placeholder:text-slate-600 focus:border-lime-300 focus:shadow-[0_0_24px_rgba(132,204,22,0.18)]"
+                    placeholder="Ej: Jugar 1 hora en la PC"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-xs font-black uppercase text-slate-300">
+                    Costo
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={rewardDraft.cost}
+                    onChange={(event) => {
+                      setRewardDraft((currentDraft) => ({
+                        ...currentDraft,
+                        cost: event.target.value,
+                      }));
+                      setRewardFormError("");
+                    }}
+                    className="w-full border-2 border-slate-600 bg-slate-950 px-3 py-3 font-mono text-sm font-black text-yellow-100 outline-none transition placeholder:text-slate-600 focus:border-yellow-200 focus:shadow-[0_0_24px_rgba(250,204,21,0.16)]"
+                    placeholder="200"
+                  />
+                </label>
+
+                {rewardFormError && (
+                  <p className="border border-rose-300/60 bg-rose-500/10 px-3 py-2 text-sm font-bold text-rose-100">
+                    {rewardFormError}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  className="inline-flex w-full items-center justify-center gap-2 border-2 border-yellow-200 bg-yellow-200 px-4 py-3 text-sm font-black uppercase text-slate-950 shadow-[0_0_28px_rgba(250,204,21,0.24)] transition hover:bg-lime-200 hover:shadow-[0_0_32px_rgba(132,204,22,0.24)] focus:outline-none focus:ring-2 focus:ring-yellow-200 focus:ring-offset-2 focus:ring-offset-slate-950"
+                >
+                  <Plus className="h-4 w-4" />
+                  Añadir al Mercado
+                </button>
+              </div>
+            </form>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <AnimatePresence initial={false}>
+                {blackMarketRewards.map((reward) => {
+                  const RewardIcon = reward.Icon ?? Gift;
+                  const canBuy = cyberCredits >= reward.cost;
+
+                  return (
+                    <motion.article
+                      key={reward.id}
+                      layout
+                      initial={{ opacity: 0, y: 12, scale: 0.96 }}
+                      animate={
+                        shakingRewardId === reward.id
+                          ? { opacity: 1, y: 0, scale: 1, x: [0, -8, 8, -6, 6, 0] }
+                          : { opacity: 1, y: 0, scale: 1, x: 0 }
+                      }
+                      exit={{ opacity: 0, y: -10, scale: 0.92 }}
+                      transition={{ duration: 0.24, ease: "easeOut" }}
+                      className={`relative min-h-44 overflow-hidden border-2 bg-slate-900/[0.86] p-4 [clip-path:polygon(0_0,calc(100%-16px)_0,100%_16px,100%_100%,16px_100%,0_calc(100%-16px))] ${
+                        canBuy
+                          ? "border-yellow-200/70 shadow-[0_0_30px_rgba(250,204,21,0.14)]"
+                          : "border-rose-300/60 shadow-[0_0_30px_rgba(251,113,133,0.1)]"
+                      }`}
+                    >
+                      <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-yellow-200 via-lime-300 to-emerald-400" />
+                      <div className="absolute -right-10 -top-10 h-28 w-28 bg-yellow-200 opacity-[0.13] blur-2xl" />
+
+                      <button
+                        type="button"
+                        aria-label={`Retirar recompensa ${reward.name}`}
+                        onClick={(event) =>
+                          handleDeleteReward(event, reward.id, reward.name)
+                        }
+                        className="absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center border border-rose-300/70 bg-rose-500/[0.12] text-rose-100 transition hover:bg-rose-400/25 hover:text-white focus:outline-none focus:ring-2 focus:ring-rose-200 focus:ring-offset-2 focus:ring-offset-slate-950"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+
+                      <div className="relative flex min-h-36 flex-col justify-between gap-4 pr-8">
+                        <div>
+                          <div className="mb-3 grid h-12 w-12 place-items-center border border-yellow-200/60 bg-yellow-200/10 text-yellow-100">
+                            <RewardIcon className="h-7 w-7 drop-shadow-[0_0_12px_rgba(250,204,21,0.68)]" />
+                          </div>
+                          <p className="text-xs font-black uppercase text-slate-400">
+                            Recompensa Real
+                          </p>
+                          <h3 className="mt-1 break-words text-xl font-black uppercase text-white">
+                            {reward.name}
+                          </h3>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1 border border-yellow-200/60 bg-yellow-200/10 px-2 py-1 font-mono text-xs font-black text-yellow-100">
+                            <Coins className="h-3.5 w-3.5" />
+                            {reward.cost} CR
+                          </span>
+                          {!canBuy && (
+                            <span className="border border-rose-300/60 bg-rose-500/10 px-2 py-1 font-mono text-xs font-black uppercase text-rose-100">
+                              Saldo bajo
+                            </span>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleBuyReward(reward)}
+                          className={`inline-flex items-center justify-center gap-2 border-2 px-3 py-2 text-xs font-black uppercase transition focus:outline-none focus:ring-2 focus:ring-yellow-200 focus:ring-offset-2 focus:ring-offset-slate-950 ${
+                            canBuy
+                              ? "border-lime-300 bg-lime-300 text-slate-950 shadow-[0_0_24px_rgba(132,204,22,0.22)] hover:bg-yellow-200"
+                              : "border-rose-300 bg-rose-500/10 text-rose-100 hover:bg-rose-400/20"
+                          }`}
+                        >
+                          <ShoppingBag className="h-4 w-4" />
+                          Comprar
+                        </button>
+                      </div>
+                    </motion.article>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+          </div>
         </motion.section>
       </section>
 
@@ -1685,7 +2083,8 @@ export default function LifeRPGDashboard() {
                     >
                       {DIFFICULTY_OPTIONS.map((difficulty) => (
                         <option key={difficulty.key} value={difficulty.key}>
-                          {difficulty.label} [{difficulty.xp} XP]
+                          {difficulty.label} [{difficulty.xp} XP /{" "}
+                          {difficulty.credits} CR]
                         </option>
                       ))}
                     </select>
@@ -1701,6 +2100,10 @@ export default function LifeRPGDashboard() {
                     </span>
                     <span className="border border-yellow-200/60 bg-yellow-200/10 px-2 py-1 font-mono text-xs font-black text-yellow-100">
                       +{selectedDifficulty.xp} XP
+                    </span>
+                    <span className="inline-flex items-center gap-1 border border-lime-300/60 bg-lime-300/10 px-2 py-1 font-mono text-xs font-black text-lime-100">
+                      <Coins className="h-3.5 w-3.5" />
+                      +{selectedDifficulty.credits} CR
                     </span>
                   </div>
                 </div>

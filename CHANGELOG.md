@@ -63,3 +63,17 @@ A nivel de diseño, la Boss Arena cambia el tono visual del dashboard. Las misio
 El valor UX de este sprint está en convertir proyectos largos en combates visibles. En vez de ver "Entregar Tesis" como una tarea enorme y abstracta, ahora puedo descomponerla en ataques concretos: escribir la introducción, ordenar el marco teórico, procesar resultados y hacer la entrega final. Cada avance baja la vida del jefe y hace que el progreso se sienta físico.
 
 Por ahora dejé esta lógica mockeada con `useState`, pensando en que más adelante los bosses y subtareas puedan persistirse en Supabase como datos relacionales. El siguiente paso natural será crear tablas para bosses y boss_subtasks, conectarlas al usuario autenticado y mantener esta misma sensación de combate con datos reales.
+
+## Sprint 5: Economía de Juego y el Mercado Negro (Recompensas Reales)
+
+En este sprint cerré una parte clave del loop de gamificación de LifeRPG: ya no se trata solamente de ganar XP y subir stats, sino también de acumular una moneda interna y gastarla en recompensas reales. Implementé los `cyberCredits` como una segunda capa de progreso, visible en el HUD principal y conectada a misiones, ataques contra jefes y recompensas finales.
+
+La decisión de sumar una economía dual cambia mucho la sensación de uso. La XP empuja el crecimiento a largo plazo del personaje, mientras que los créditos funcionan como una recompensa más inmediata y tangible. Cada hábito completado y cada sub-tarea importante ahora dejan loot, lo que hace que incluso las acciones pequeñas tengan un impacto visible dentro del sistema.
+
+También construí el Mercado Negro, una tienda de recompensas con estética de contrabando cyberpunk. Desde ahí puedo registrar mis propios ítems, asignarles un costo y comprarlos cuando tengo saldo suficiente. Esto transforma la app en un acuerdo personal: yo defino qué premios valen la pena, cuánto cuestan y qué esfuerzo necesito hacer para desbloquearlos.
+
+El desafío técnico principal estuvo en manejar validaciones transaccionales en React. Al comprar una recompensa, el sistema primero valida si tengo créditos suficientes. Si la compra es válida, descuenta el saldo, muestra una notificación de éxito y registra la acción en el Quest Log. Si no alcanza el saldo, la tarjeta responde con una animación de shake y un error claro. Esa validación es simple, pero es la base de una economía confiable.
+
+A nivel UX, este sprint aporta algo muy importante: autogestión de incentivos. LifeRPG empieza a conectar tareas reales con recompensas reales, manteniendo la fantasía RPG sin perder utilidad práctica. Con este Mercado Negro, el loop queda mucho más completo: hago hábitos, gano XP y créditos, progreso mi personaje, derroto proyectos grandes y canjeo recompensas que yo mismo definí.
+
+El próximo paso lógico será persistir las recompensas del Mercado Negro en Supabase, junto con un historial más formal de transacciones. Eso permitiría auditar compras, recuperar ítems entre sesiones y empezar a balancear mejor la economía del juego con datos reales.

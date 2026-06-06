@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..", "dist");
-const port = Number(process.env.PORT || 4173);
+const host = process.env.HOST || process.argv[2] || "127.0.0.1";
+const port = Number(process.env.PORT || process.argv[3] || 4173);
 
 const mimeTypes = {
   ".css": "text/css",
@@ -18,7 +19,7 @@ const mimeTypes = {
 };
 
 const server = http.createServer(async (request, response) => {
-  const requestUrl = new URL(request.url, `http://127.0.0.1:${port}`);
+  const requestUrl = new URL(request.url, `http://${host}:${port}`);
   const safePath = path.normalize(requestUrl.pathname).replace(/^(\.\.[/\\])+/, "");
   const filePath = path.join(root, safePath === "/" ? "index.html" : safePath);
 
@@ -38,6 +39,7 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
-server.listen(port, "127.0.0.1", () => {
-  console.log(`LifeRPG preview running at http://127.0.0.1:${port}`);
+server.listen(port, host, () => {
+  const displayHost = host === "0.0.0.0" ? "127.0.0.1" : host;
+  console.log(`LifeRPG preview running at http://${displayHost}:${port}`);
 });
