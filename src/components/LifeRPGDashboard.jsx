@@ -4,10 +4,21 @@ import { createClient } from "@supabase/supabase-js";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  PolarAngleAxis,
+  PolarGrid,
+  PolarRadiusAxis,
+  Radar,
+  RadarChart,
+  ResponsiveContainer,
+  Tooltip,
+} from "recharts";
+import {
   Activity,
+  BarChart3,
   Battery,
   BookOpen,
   Brain,
+  CalendarDays,
   Code2,
   Coins,
   Crown,
@@ -53,6 +64,7 @@ const supabase = hasSupabaseConfig
 // life_rpg_profiles: user_id uuid PK, level int, xp int, xp_needed int, cyber_credits int, stats jsonb, updated_at timestamptz
 // life_rpg_habits: id text PK, user_id uuid, label text, stat text, xp int, created_at timestamptz
 // life_rpg_rewards: id text PK, user_id uuid, name text, cost int, icon text, created_at timestamptz
+// life_rpg_activity_logs: id text PK, user_id uuid, date date, type text, label text, value int, created_at timestamptz
 const PROFILE_TABLE = "life_rpg_profiles";
 const HABITS_TABLE = "life_rpg_habits";
 const DEMO_USER_ID = "demo-user";
@@ -323,6 +335,80 @@ const INITIAL_AUTH_FORM = {
   password: "",
 };
 
+function getDateKey(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function createSeedScore(seed) {
+  return Array.from(seed).reduce(
+    (score, char, index) => score + char.charCodeAt(0) * (index + 3),
+    0,
+  );
+}
+
+function generateMockActivityLogs(seed = DEMO_USER_ID) {
+  const seedScore = createSeedScore(seed);
+  const today = new Date();
+  const logs = [];
+
+  for (let offset = 29; offset >= 0; offset -= 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - offset);
+    const dayScore = (seedScore + offset * 17 + date.getDate() * 11) % 7;
+    const completions = Math.max(0, dayScore - 1);
+
+    for (let index = 0; index < completions; index += 1) {
+      logs.push({
+        id: `mock-${getDateKey(date)}-${index}`,
+        date: getDateKey(date),
+        type: index % 3 === 0 ? "habit" : index % 3 === 1 ? "boss" : "focus",
+        label: index % 2 === 0 ? "Misión diaria" : "Ataque completado",
+        value: 1,
+      });
+    }
+  }
+
+  return logs;
+}
+
+function buildThirtyDayActivity(logs) {
+  const today = new Date();
+  const groupedLogs = logs.reduce((grouped, log) => {
+    grouped.set(log.date, (grouped.get(log.date) ?? 0) + Number(log.value ?? 1));
+    return grouped;
+  }, new Map());
+
+  return Array.from({ length: 30 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (29 - index));
+    const dateKey = getDateKey(date);
+    const count = groupedLogs.get(dateKey) ?? 0;
+
+    return {
+      date: dateKey,
+      count,
+      day: date.toLocaleDateString("es-AR", {
+        day: "2-digit",
+        month: "2-digit",
+      }),
+    };
+  });
+}
+
+function calculateCurrentStreak(activityDays) {
+  let streak = 0;
+
+  for (let index = activityDays.length - 1; index >= 0; index -= 1) {
+    if (activityDays[index].count <= 0) {
+      break;
+    }
+
+    streak += 1;
+  }
+
+  return streak;
+}
+
 function calculateLevelProgress(totalXp, currentNeeded) {
   let nextXp = totalXp;
   let nextNeeded = currentNeeded;
@@ -414,6 +500,279 @@ function buildProfileRow(userId, player) {
   };
 }
 
+function OracleTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) {
+    return null;
+  }
+
+  return (
+    <div className="border border-cyan-300/70 bg-slate-950/95 px-3 py-2 shadow-[0_0_24px_rgba(34,211,238,0.22)]">
+      <p className="font-mono text-xs font-black uppercase text-cyan-100">
+        {label}
+      </p>
+      <p className="font-mono text-sm font-black text-white">
+        Valor {payload[0].value}
+      </p>
+    </div>
+  );
+}
+
+function getHeatLevelClass(count) {
+  if (count >= 5) {
+    return "border-yellow-200 bg-yellow-200 shadow-[0_0_18px_rgba(250,204,21,0.36)]";
+  }
+
+  if (count >= 4) {
+    return "border-lime-300 bg-lime-300 shadow-[0_0_16px_rgba(132,204,22,0.32)]";
+  }
+
+  if (count >= 3) {
+    return "border-emerald-300 bg-emerald-400/85 shadow-[0_0_14px_rgba(52,211,153,0.28)]";
+  }
+
+  if (count >= 2) {
+    return "border-cyan-300 bg-cyan-400/70 shadow-[0_0_14px_rgba(34,211,238,0.22)]";
+  }
+
+  if (count >= 1) {
+    return "border-cyan-900 bg-cyan-950";
+  }
+
+  return "border-slate-800 bg-slate-900";
+}
+
+function OraclePanel({ stats, activityLogs, level, totalPower, cyberCredits }) {
+  const [isRadarReady, setIsRadarReady] = useState(false);
+  const radarData = useMemo(
+    () =>
+      STAT_CONFIG.map((stat) => ({
+        stat: stat.label,
+        name: stat.name,
+        value: stats[stat.key],
+      })),
+    [stats],
+  );
+  const activityDays = useMemo(
+    () => buildThirtyDayActivity(activityLogs),
+    [activityLogs],
+  );
+  const totalCompletions = activityDays.reduce(
+    (sum, day) => sum + day.count,
+    0,
+  );
+  const activeDays = activityDays.filter((day) => day.count > 0).length;
+  const currentStreak = calculateCurrentStreak(activityDays);
+  const maxStat = Math.max(30, ...radarData.map((stat) => stat.value));
+  const strongestStat = radarData.reduce((strongest, stat) =>
+    stat.value > strongest.value ? stat : strongest,
+  );
+
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      setIsRadarReady(true);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, []);
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: "easeOut" }}
+      className="relative overflow-hidden border-2 border-cyan-300/70 bg-slate-950/[0.88] p-4 shadow-[0_0_48px_rgba(34,211,238,0.14)] [clip-path:polygon(0_0,calc(100%-22px)_0,100%_22px,100%_100%,22px_100%,0_calc(100%-22px))] sm:p-5"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(34,211,238,0.16),transparent_34%,rgba(217,70,239,0.12)_72%,transparent)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-400 to-yellow-200" />
+
+      <div className="relative mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="flex items-center gap-2 text-xs font-black uppercase text-cyan-100">
+            <BarChart3 className="h-4 w-4" />
+            El Oráculo
+          </p>
+          <h2 className="mt-1 text-2xl font-black uppercase text-white sm:text-3xl">
+            Analíticas del Jugador
+          </h2>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="border border-yellow-200/60 bg-yellow-200/10 px-3 py-2 font-mono text-xs font-black uppercase text-yellow-100">
+            LVL {level}
+          </span>
+          <span className="border border-cyan-300/60 bg-cyan-300/10 px-3 py-2 font-mono text-xs font-black uppercase text-cyan-100">
+            POW {totalPower}
+          </span>
+          <span className="inline-flex items-center gap-1 border border-lime-300/60 bg-lime-300/10 px-3 py-2 font-mono text-xs font-black uppercase text-lime-100">
+            <Coins className="h-3.5 w-3.5" />
+            {cyberCredits} CR
+          </span>
+        </div>
+      </div>
+
+      <div className="relative grid gap-5 lg:grid-cols-[1fr_1fr]">
+        <div className="min-w-0 overflow-hidden border-2 border-cyan-300/50 bg-slate-900/70 p-4 [clip-path:polygon(0_0,calc(100%-16px)_0,100%_16px,100%_100%,16px_100%,0_calc(100%-16px))]">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase text-slate-400">
+                Skill Tree
+              </p>
+              <h3 className="text-xl font-black uppercase text-white">
+                Build Actual
+              </h3>
+            </div>
+            <span className="border border-fuchsia-300/60 bg-fuchsia-300/10 px-2 py-1 font-mono text-xs font-black uppercase text-fuchsia-100">
+              Main {strongestStat.stat}
+            </span>
+          </div>
+
+          <div className="h-[320px] min-w-0 w-full">
+            {isRadarReady ? (
+              <ResponsiveContainer width="100%" height={320}>
+                <RadarChart
+                  data={radarData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius="74%"
+                  margin={{ top: 18, right: 30, bottom: 18, left: 30 }}
+                >
+                  <PolarGrid
+                    gridType="polygon"
+                    radialLines
+                    stroke="rgba(148,163,184,0.28)"
+                  />
+                  <PolarAngleAxis
+                    dataKey="stat"
+                    tick={{
+                      fill: "#cffafe",
+                      fontSize: 12,
+                      fontWeight: 900,
+                    }}
+                  />
+                  <PolarRadiusAxis
+                    angle={90}
+                    domain={[0, maxStat]}
+                    tick={false}
+                    axisLine={false}
+                  />
+                  <Tooltip content={<OracleTooltip />} />
+                  <Radar
+                    name="Build"
+                    dataKey="value"
+                    stroke="#22d3ee"
+                    strokeWidth={3}
+                    fill="#22d3ee"
+                    fillOpacity={0.32}
+                    dot={{
+                      r: 4,
+                      fill: "#fef08a",
+                      stroke: "#22d3ee",
+                      strokeWidth: 2,
+                    }}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="grid h-full place-items-center border border-cyan-300/30 bg-slate-950/70 font-mono text-xs font-black uppercase text-cyan-100">
+                &gt; Calibrando radar...
+              </div>
+            )}
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-5">
+            {radarData.map((stat) => (
+              <div
+                key={stat.stat}
+                className="border border-cyan-300/30 bg-slate-950/70 px-2 py-2 text-center"
+              >
+                <p className="font-mono text-xs font-black text-cyan-100">
+                  {stat.stat}
+                </p>
+                <p className="font-mono text-lg font-black text-white">
+                  {stat.value}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="min-w-0 overflow-hidden border-2 border-lime-300/50 bg-slate-900/70 p-4 [clip-path:polygon(0_0,calc(100%-16px)_0,100%_16px,100%_100%,16px_100%,0_calc(100%-16px))]">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase text-slate-400">
+                Activity Logs
+              </p>
+              <h3 className="text-xl font-black uppercase text-white">
+                Consistencia 30D
+              </h3>
+            </div>
+            <CalendarDays className="h-8 w-8 text-lime-200 drop-shadow-[0_0_12px_rgba(132,204,22,0.68)]" />
+          </div>
+
+          <div className="mb-4 grid gap-2 sm:grid-cols-3">
+            <div className="border border-cyan-300/40 bg-cyan-300/10 px-3 py-2">
+              <p className="text-xs font-black uppercase text-slate-300">
+                Acciones
+              </p>
+              <p className="font-mono text-2xl font-black text-cyan-100">
+                {totalCompletions}
+              </p>
+            </div>
+            <div className="border border-lime-300/40 bg-lime-300/10 px-3 py-2">
+              <p className="text-xs font-black uppercase text-slate-300">
+                Días Activos
+              </p>
+              <p className="font-mono text-2xl font-black text-lime-100">
+                {activeDays}/30
+              </p>
+            </div>
+            <div className="border border-yellow-200/40 bg-yellow-200/10 px-3 py-2">
+              <p className="text-xs font-black uppercase text-slate-300">
+                Racha
+              </p>
+              <p className="font-mono text-2xl font-black text-yellow-100">
+                {currentStreak}D
+              </p>
+            </div>
+          </div>
+
+          <div
+            className="grid grid-cols-6 gap-2 sm:grid-cols-10"
+            aria-label="Mapa de calor de actividad de los últimos 30 días"
+          >
+            {activityDays.map((day) => (
+              <div
+                key={day.date}
+                title={`${day.day}: ${day.count} acciones`}
+                aria-label={`${day.day}: ${day.count} acciones completadas`}
+                className={`aspect-square min-h-9 border transition ${getHeatLevelClass(
+                  day.count,
+                )}`}
+              >
+                <span className="grid h-full place-items-center font-mono text-[10px] font-black text-white/80">
+                  {day.count > 0 ? day.count : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-black uppercase text-slate-300">
+            <span>Baja</span>
+            {[0, 1, 2, 3, 5].map((level) => (
+              <span
+                key={level}
+                className={`h-4 w-4 border ${getHeatLevelClass(level)}`}
+              />
+            ))}
+            <span>Alta</span>
+          </div>
+        </div>
+      </div>
+    </motion.section>
+  );
+}
+
 export default function LifeRPGDashboard() {
   const [session, setSession] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -423,10 +782,14 @@ export default function LifeRPGDashboard() {
   const [authError, setAuthError] = useState("");
   const [authInfo, setAuthInfo] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [activeView, setActiveView] = useState("dashboard");
   const [player, setPlayer] = useState(INITIAL_PLAYER);
   const [habits, setHabits] = useState([]);
   const [bosses, setBosses] = useState(INITIAL_BOSSES);
   const [blackMarketRewards, setBlackMarketRewards] = useState(INITIAL_REWARDS);
+  const [activityLogs, setActivityLogs] = useState(() =>
+    generateMockActivityLogs(DEMO_USER_ID),
+  );
   const [damageBursts, setDamageBursts] = useState([]);
   const [victoryBanner, setVictoryBanner] = useState(null);
   const [rewardBursts, setRewardBursts] = useState([]);
@@ -475,6 +838,19 @@ export default function LifeRPGDashboard() {
     (message) => showToast(message, "success"),
     [showToast],
   );
+
+  const appendActivityLog = useCallback((type, label, value = 1) => {
+    setActivityLogs((currentLogs) => [
+      ...currentLogs,
+      {
+        id: createClientId("activity"),
+        date: getDateKey(new Date()),
+        type,
+        label,
+        value,
+      },
+    ]);
+  }, []);
 
   const statRows = useMemo(
     () =>
@@ -580,11 +956,13 @@ export default function LifeRPGDashboard() {
 
         setPlayer(nextPlayer);
         setHabits(remoteHabitRows.map(decorateHabit));
+        setActivityLogs(generateMockActivityLogs(nextUserId));
         setLastAction("Partida sincronizada");
       } catch {
         setPlayer(INITIAL_PLAYER);
         setHabits(INITIAL_HABITS);
         setBlackMarketRewards(INITIAL_REWARDS);
+        setActivityLogs(generateMockActivityLogs("fallback-local"));
         setLastAction("Modo fallback local");
         showErrorToast(
           "No pude sincronizar la nube. Cargué un estado local temporal.",
@@ -628,10 +1006,12 @@ export default function LifeRPGDashboard() {
       setAuthInfo("");
 
       if (!nextSession) {
+        setActiveView("dashboard");
         setPlayer(INITIAL_PLAYER);
         setHabits([]);
         setBosses(INITIAL_BOSSES);
         setBlackMarketRewards(INITIAL_REWARDS);
+        setActivityLogs(generateMockActivityLogs(DEMO_USER_ID));
         setDamageBursts([]);
         setVictoryBanner(null);
         setLastAction("Sistema offline");
@@ -655,6 +1035,7 @@ export default function LifeRPGDashboard() {
       setHabits(INITIAL_HABITS);
       setBosses(INITIAL_BOSSES);
       setBlackMarketRewards(INITIAL_REWARDS);
+      setActivityLogs(generateMockActivityLogs(DEMO_USER_ID));
       setDamageBursts([]);
       setVictoryBanner(null);
       setLastAction("Modo demo local");
@@ -730,10 +1111,12 @@ export default function LifeRPGDashboard() {
   const handleSignOut = async () => {
     if (isDemoSession) {
       setSession(null);
+      setActiveView("dashboard");
       setPlayer(INITIAL_PLAYER);
       setHabits([]);
       setBosses(INITIAL_BOSSES);
       setBlackMarketRewards(INITIAL_REWARDS);
+      setActivityLogs(generateMockActivityLogs(DEMO_USER_ID));
       setLastAction("Sistema offline");
       return;
     }
@@ -847,6 +1230,7 @@ export default function LifeRPGDashboard() {
       actionLabel,
       detail: `+1 ${statKey.toUpperCase()}`,
     });
+    appendActivityLog("habit", actionLabel);
   };
 
   const grantCyberCredits = (creditGain, actionLabel) => {
@@ -914,6 +1298,7 @@ export default function LifeRPGDashboard() {
         damage: subtask.damage,
       },
     ]);
+    appendActivityLog("boss", subtask.name);
 
     window.setTimeout(() => {
       setDamageBursts((currentBursts) =>
@@ -1467,6 +1852,50 @@ export default function LifeRPGDashboard() {
           </AnimatePresence>
         </motion.header>
 
+        <nav
+          aria-label="Vistas principales"
+          className="grid gap-2 sm:grid-cols-2"
+        >
+          {[
+            {
+              key: "dashboard",
+              label: "Dashboard",
+              Icon: Activity,
+              accent: "cyan",
+            },
+            {
+              key: "oracle",
+              label: "El Oráculo",
+              Icon: BarChart3,
+              accent: "fuchsia",
+            },
+          ].map((view) => {
+            const Icon = view.Icon;
+            const isActive = activeView === view.key;
+
+            return (
+              <button
+                key={view.key}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => setActiveView(view.key)}
+                className={`flex items-center justify-center gap-2 border-2 px-4 py-3 text-sm font-black uppercase transition focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:ring-offset-2 focus:ring-offset-slate-950 ${
+                  isActive
+                    ? view.accent === "cyan"
+                      ? "border-cyan-300 bg-cyan-300 text-slate-950 shadow-[0_0_28px_rgba(34,211,238,0.24)]"
+                      : "border-fuchsia-300 bg-fuchsia-300 text-slate-950 shadow-[0_0_28px_rgba(217,70,239,0.24)]"
+                    : "border-slate-700 bg-slate-950/80 text-slate-300 hover:border-yellow-200 hover:text-yellow-100"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {view.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {activeView === "dashboard" ? (
+          <>
         <div className="grid gap-5 lg:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.35fr)]">
           <motion.aside
             initial={{ opacity: 0, x: -18 }}
@@ -1978,6 +2407,16 @@ export default function LifeRPGDashboard() {
             </div>
           </div>
         </motion.section>
+          </>
+        ) : (
+          <OraclePanel
+            stats={stats}
+            activityLogs={activityLogs}
+            level={level}
+            totalPower={totalPower}
+            cyberCredits={cyberCredits}
+          />
+        )}
       </section>
 
       <AnimatePresence>

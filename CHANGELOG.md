@@ -77,3 +77,17 @@ El desafío técnico principal estuvo en manejar validaciones transaccionales en
 A nivel UX, este sprint aporta algo muy importante: autogestión de incentivos. LifeRPG empieza a conectar tareas reales con recompensas reales, manteniendo la fantasía RPG sin perder utilidad práctica. Con este Mercado Negro, el loop queda mucho más completo: hago hábitos, gano XP y créditos, progreso mi personaje, derroto proyectos grandes y canjeo recompensas que yo mismo definí.
 
 El próximo paso lógico será persistir las recompensas del Mercado Negro en Supabase, junto con un historial más formal de transacciones. Eso permitiría auditar compras, recuperar ítems entre sesiones y empezar a balancear mejor la economía del juego con datos reales.
+
+## Sprint 6: El Oráculo (Visualización de Datos y Analíticas)
+
+En este sprint agregué una nueva capa de lectura para LifeRPG: El Oráculo. Hasta ahora la aplicación se sentía fuerte en acción inmediata, recompensas, jefes y economía, pero faltaba una vista que me permitiera observar mi progreso como si estuviera leyendo la hoja de estadísticas de un RPG complejo.
+
+Implementé una vista dedicada de analíticas con un Radar Chart para representar la build del jugador a partir de los cinco atributos principales: STR, INT, VIT, CHA y AGI. Esta visualización permite entender rápidamente hacia dónde se está inclinando mi personaje. No es lo mismo ver cinco números separados que ver una forma completa: el gráfico convierte los stats en una silueta de progreso.
+
+También construí un mapa de calor de actividad para los últimos 30 días, inspirado en la lógica visual de GitHub. Cada cuadro representa un día y su intensidad cambia según la cantidad de acciones completadas. Esto ayuda a que el esfuerzo cotidiano no desaparezca: cada hábito, cada ataque a un boss y cada sesión activa empieza a dejar una marca acumulativa.
+
+El desafío técnico principal fue procesar un array plano de `activity_logs` y transformarlo en datos estructurados agrupados por fecha. Para este frontend generé un historial mock determinístico, pero lo modelé con una forma cercana a la que después podría venir de Supabase: logs individuales con fecha, tipo, label y valor. A partir de ahí agrupé por día, calculé acciones totales, días activos y racha actual.
+
+Desde el punto de vista de retención, este sprint es importante porque le muestra al usuario que su esfuerzo tiene memoria. La gamificación no funciona solo por recompensas inmediatas; también necesita evidencia de avance a largo plazo. El Oráculo empieza a cumplir ese rol: convertir acciones pequeñas en una narrativa visual de crecimiento.
+
+El próximo paso lógico será persistir los `activity_logs` reales en Supabase, conectar el heatmap con datos históricos verdaderos y sumar filtros por tipo de actividad, atributo entrenado o periodo de tiempo.
