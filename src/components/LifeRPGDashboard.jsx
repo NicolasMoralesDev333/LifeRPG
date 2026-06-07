@@ -17,8 +17,10 @@ import {
   BarChart3,
   Battery,
   BookOpen,
+  Bot,
   Brain,
   CalendarDays,
+  CheckCircle2,
   Code2,
   Coins,
   Crown,
@@ -41,6 +43,7 @@ import {
   Swords,
   Terminal,
   Trash2,
+  WandSparkles,
   Trophy,
   X,
   Zap,
@@ -334,6 +337,121 @@ const INITIAL_AUTH_FORM = {
   email: "",
   password: "",
 };
+
+const DUNGEON_MASTER_SYSTEM_PROMPT = `
+Eres el Dungeon Master de LifeRPG.
+Transforma una meta humana en un JSON estricto con esta forma:
+{
+  "bossName": "Nombre épico y concreto",
+  "bossHp": 500,
+  "rewardXp": 240,
+  "rewardCredits": 160,
+  "subtasks": [
+    "Subtarea accionable 1",
+    "Subtarea accionable 2",
+    "Subtarea accionable 3",
+    "Subtarea accionable 4"
+  ]
+}
+No devuelvas Markdown. No agregues texto fuera del JSON.
+`.trim();
+
+function createFallbackQuestGoal(prompt) {
+  const normalizedPrompt = prompt.toLowerCase();
+
+  if (
+    normalizedPrompt.includes("programador") ||
+    normalizedPrompt.includes("frontend") ||
+    normalizedPrompt.includes("trabajo")
+  ) {
+    return {
+      bossName: "La Bestia de la Entrevista Técnica",
+      bossHp: 500,
+      rewardXp: 320,
+      rewardCredits: 220,
+      subtasks: [
+        "Armar portfolio en React con 3 proyectos fuertes",
+        "Resolver 5 ejercicios de lógica y estructuras básicas",
+        "Mejorar CV y perfil de LinkedIn con foco frontend",
+        "Preparar respuestas para entrevistas técnicas",
+        "Postular a 10 ofertas y registrar feedback",
+      ],
+    };
+  }
+
+  if (
+    normalizedPrompt.includes("tesis") ||
+    normalizedPrompt.includes("estudiar") ||
+    normalizedPrompt.includes("examen")
+  ) {
+    return {
+      bossName: "El Guardián del Conocimiento Sellado",
+      bossHp: 460,
+      rewardXp: 280,
+      rewardCredits: 180,
+      subtasks: [
+        "Definir el alcance exacto del objetivo académico",
+        "Crear un calendario de bloques de estudio",
+        "Completar la primera entrega o capítulo base",
+        "Revisar avances con una persona de confianza",
+        "Hacer una simulación o revisión final",
+      ],
+    };
+  }
+
+  return {
+    bossName: "El Coloso de la Meta Inconclusa",
+    bossHp: 420,
+    rewardXp: 260,
+    rewardCredits: 170,
+    subtasks: [
+      "Definir el resultado final en una frase medible",
+      "Separar la meta en 4 entregables concretos",
+      "Completar una primera versión imperfecta",
+      "Pedir feedback y ajustar el plan",
+      "Cerrar la entrega final y registrar aprendizajes",
+    ],
+  };
+}
+
+async function generateQuestFromAI(prompt) {
+  await new Promise((resolve) => {
+    window.setTimeout(resolve, 3000);
+  });
+
+  return createFallbackQuestGoal(prompt);
+}
+
+function createBossFromAIQuest(quest) {
+  const bossHp = Number(quest.bossHp ?? 420);
+  const subtasks = (quest.subtasks ?? []).slice(0, 5);
+  const safeSubtasks =
+    subtasks.length > 0
+      ? subtasks
+      : ["Definir el primer ataque", "Completar una acción inicial"];
+  const baseDamage = Math.max(40, Math.floor(bossHp / safeSubtasks.length));
+
+  return {
+    id: createClientId("ai-boss"),
+    name: quest.bossName || "Jefe Invocado por el Oráculo",
+    totalHp: bossHp,
+    currentHp: bossHp,
+    rewardXp: Number(quest.rewardXp ?? Math.round(bossHp * 0.62)),
+    rewardCredits: Number(quest.rewardCredits ?? Math.round(bossHp * 0.38)),
+    Icon: Bot,
+    isDefeated: false,
+    subtasks: safeSubtasks.map((name, index) => ({
+      id: createClientId(`ai-attack-${index}`),
+      name,
+      damage:
+        index === safeSubtasks.length - 1
+          ? Math.max(30, bossHp - baseDamage * (safeSubtasks.length - 1))
+          : baseDamage,
+      credits: Math.max(18, Math.round(baseDamage / 2)),
+      isCompleted: false,
+    })),
+  };
+}
 
 function getDateKey(date) {
   return date.toISOString().slice(0, 10);
@@ -796,6 +914,11 @@ export default function LifeRPGDashboard() {
   const [lastAction, setLastAction] = useState("Sistema offline");
   const [isForgeModalOpen, setIsForgeModalOpen] = useState(false);
   const [missionDraft, setMissionDraft] = useState(INITIAL_MISSION_DRAFT);
+  const [isDungeonMasterOpen, setIsDungeonMasterOpen] = useState(false);
+  const [aiGoalPrompt, setAiGoalPrompt] = useState("");
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+  const [aiGeneratedQuest, setAiGeneratedQuest] = useState(null);
+  const [aiError, setAiError] = useState("");
   const [rewardDraft, setRewardDraft] = useState(INITIAL_REWARD_DRAFT);
   const [formError, setFormError] = useState("");
   const [rewardFormError, setRewardFormError] = useState("");
@@ -1338,6 +1461,70 @@ export default function LifeRPGDashboard() {
     setIsForgeModalOpen(false);
     setMissionDraft(INITIAL_MISSION_DRAFT);
     setFormError("");
+  };
+
+  const openDungeonMasterModal = () => {
+    setAiGoalPrompt("");
+    setAiGeneratedQuest(null);
+    setAiError("");
+    setIsDungeonMasterOpen(true);
+  };
+
+  const closeDungeonMasterModal = () => {
+    if (isAiGenerating) {
+      return;
+    }
+
+    setIsDungeonMasterOpen(false);
+    setAiGoalPrompt("");
+    setAiGeneratedQuest(null);
+    setAiError("");
+  };
+
+  const handleGenerateQuest = async (event) => {
+    event.preventDefault();
+
+    const goalPrompt = aiGoalPrompt.trim();
+
+    if (!goalPrompt) {
+      setAiError("El Dungeon Master necesita una meta para invocar un jefe.");
+      return;
+    }
+
+    setAiError("");
+    setAiGeneratedQuest(null);
+    setIsAiGenerating(true);
+    setLastAction("Dungeon Master consultado");
+
+    try {
+      const quest = await generateQuestFromAI(goalPrompt);
+
+      if (!quest?.bossName || !Array.isArray(quest.subtasks)) {
+        throw new Error("La IA devolvió un contrato inválido.");
+      }
+
+      setAiGeneratedQuest(quest);
+      setLastAction(`Jefe generado: ${quest.bossName}`);
+    } catch {
+      setAiError("La invocación falló. Probá reformular la meta.");
+      showErrorToast("Error del Dungeon Master: JSON inválido.");
+    } finally {
+      setIsAiGenerating(false);
+    }
+  };
+
+  const handleAcceptGeneratedQuest = () => {
+    if (!aiGeneratedQuest) {
+      return;
+    }
+
+    const aiBoss = createBossFromAIQuest(aiGeneratedQuest);
+
+    setBosses((currentBosses) => [aiBoss, ...currentBosses]);
+    appendActivityLog("ai", aiBoss.name);
+    setLastAction(`Misión IA aceptada: ${aiBoss.name}`);
+    showSuccessToast(`Boss invocado: ${aiBoss.name}`);
+    closeDungeonMasterModal();
   };
 
   const handleCreateHabit = (event) => {
@@ -2104,6 +2291,16 @@ export default function LifeRPGDashboard() {
                     <h2 className="mt-1 text-3xl font-black uppercase text-white sm:text-4xl">
                       {activeBoss.name}
                     </h2>
+                    <motion.button
+                      type="button"
+                      onClick={openDungeonMasterModal}
+                      whileHover={{ scale: 1.02, y: -1 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="mt-4 inline-flex items-center gap-2 border-2 border-fuchsia-300 bg-fuchsia-300/10 px-3 py-2 text-xs font-black uppercase text-fuchsia-100 shadow-[0_0_28px_rgba(217,70,239,0.2)] transition hover:border-cyan-200 hover:bg-cyan-300/15 hover:text-cyan-100 focus:outline-none focus:ring-2 focus:ring-fuchsia-200 focus:ring-offset-2 focus:ring-offset-slate-950"
+                    >
+                      <WandSparkles className="h-4 w-4 animate-pulse" />
+                      Consultar al Dungeon Master (IA)
+                    </motion.button>
                   </div>
                   <div className="grid h-16 w-16 shrink-0 place-items-center border-2 border-rose-400 bg-rose-500/10 shadow-[0_0_28px_rgba(225,29,72,0.28)] [clip-path:polygon(50%_0,100%_25%,100%_76%,50%_100%,0_76%,0_25%)]">
                     <ActiveBossIcon className="h-8 w-8 text-rose-100 drop-shadow-[0_0_12px_rgba(251,113,133,0.8)]" />
@@ -2222,6 +2419,14 @@ export default function LifeRPGDashboard() {
               <span className="border border-lime-300/60 bg-lime-300/10 px-3 py-2 font-mono text-xs font-black uppercase text-lime-100">
                 PROJECT CLEAR
               </span>
+              <button
+                type="button"
+                onClick={openDungeonMasterModal}
+                className="inline-flex items-center gap-2 border-2 border-fuchsia-300 bg-fuchsia-300/10 px-3 py-2 text-xs font-black uppercase text-fuchsia-100 shadow-[0_0_28px_rgba(217,70,239,0.2)] transition hover:border-cyan-200 hover:bg-cyan-300/15 hover:text-cyan-100 focus:outline-none focus:ring-2 focus:ring-fuchsia-200 focus:ring-offset-2 focus:ring-offset-slate-950"
+              >
+                <WandSparkles className="h-4 w-4 animate-pulse" />
+                Consultar al Dungeon Master (IA)
+              </button>
             </div>
           )}
         </motion.section>
@@ -2418,6 +2623,170 @@ export default function LifeRPGDashboard() {
           />
         )}
       </section>
+
+      <AnimatePresence>
+        {isDungeonMasterOpen && (
+          <motion.div
+            className="fixed inset-0 z-50 grid place-items-center bg-slate-950/[0.82] px-4 py-6 backdrop-blur-md"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="dungeon-master-title"
+              initial={{ opacity: 0, y: 28, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 24, scale: 0.96 }}
+              transition={{ duration: 0.24, ease: "easeOut" }}
+              className="relative max-h-[92vh] w-full max-w-3xl overflow-y-auto border-2 border-fuchsia-300 bg-slate-950/[0.96] p-5 shadow-[0_0_68px_rgba(217,70,239,0.28),0_0_92px_rgba(34,211,238,0.12)] [clip-path:polygon(0_0,calc(100%-22px)_0,100%_22px,100%_100%,22px_100%,0_calc(100%-22px))] sm:p-6"
+            >
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(217,70,239,0.18),transparent_34%,rgba(34,211,238,0.14)_72%,transparent)]" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-fuchsia-300 via-cyan-300 to-yellow-200" />
+
+              <div className="relative mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <p className="flex items-center gap-2 text-xs font-black uppercase text-fuchsia-100">
+                    <Bot className="h-4 w-4" />
+                    Orbe del Oráculo
+                  </p>
+                  <h2
+                    id="dungeon-master-title"
+                    className="mt-1 text-2xl font-black uppercase text-white sm:text-3xl"
+                  >
+                    Dungeon Master IA
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  aria-label="Cerrar Dungeon Master"
+                  disabled={isAiGenerating}
+                  onClick={closeDungeonMasterModal}
+                  className="grid h-9 w-9 shrink-0 place-items-center border border-fuchsia-300/70 bg-fuchsia-500/10 text-fuchsia-100 transition hover:bg-fuchsia-400/25 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-fuchsia-200 focus:ring-offset-2 focus:ring-offset-slate-950"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <form
+                className="relative space-y-4"
+                onSubmit={handleGenerateQuest}
+              >
+                <label className="block">
+                  <span className="mb-2 flex items-center gap-2 text-xs font-black uppercase text-slate-300">
+                    <Terminal className="h-4 w-4 text-cyan-200" />
+                    Meta del mundo real
+                  </span>
+                  <textarea
+                    value={aiGoalPrompt}
+                    disabled={isAiGenerating}
+                    onChange={(event) => {
+                      setAiGoalPrompt(event.target.value);
+                      setAiError("");
+                    }}
+                    className="min-h-28 w-full resize-none border-2 border-slate-600 bg-slate-900 px-3 py-3 font-mono text-sm font-bold text-cyan-50 outline-none transition placeholder:text-slate-600 focus:border-fuchsia-300 focus:shadow-[0_0_24px_rgba(217,70,239,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
+                    placeholder="Ej: Quiero conseguir mi primer trabajo como Programador Frontend"
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={isAiGenerating}
+                  className="inline-flex w-full items-center justify-center gap-2 border-2 border-fuchsia-300 bg-fuchsia-300 px-4 py-3 text-sm font-black uppercase text-slate-950 shadow-[0_0_30px_rgba(217,70,239,0.28)] transition hover:bg-cyan-200 hover:shadow-[0_0_34px_rgba(34,211,238,0.3)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <WandSparkles className="h-4 w-4" />
+                  {isAiGenerating
+                    ? "Canalizando..."
+                    : "Consultar al Dungeon Master"}
+                </button>
+              </form>
+
+              <AnimatePresence mode="wait">
+                {isAiGenerating && (
+                  <motion.div
+                    key="ai-loading"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="relative mt-5 overflow-hidden border-2 border-cyan-300/60 bg-cyan-300/10 p-4 font-mono text-sm font-black uppercase text-cyan-100 shadow-[0_0_30px_rgba(34,211,238,0.16)]"
+                  >
+                    <div className="absolute inset-y-0 left-0 w-1/3 animate-pulse bg-cyan-300/10 blur-xl" />
+                    <div className="relative flex items-center gap-3">
+                      <WandSparkles className="h-5 w-5 animate-pulse text-fuchsia-100" />
+                      El Dungeon Master está tejiendo tu destino...
+                    </div>
+                  </motion.div>
+                )}
+
+                {aiGeneratedQuest && !isAiGenerating && (
+                  <motion.div
+                    key="ai-result"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="relative mt-5 border-2 border-yellow-200/70 bg-slate-900/80 p-4 shadow-[0_0_34px_rgba(250,204,21,0.14)] [clip-path:polygon(0_0,calc(100%-16px)_0,100%_16px,100%_100%,16px_100%,0_calc(100%-16px))]"
+                  >
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-xs font-black uppercase text-yellow-100">
+                          Boss generado
+                        </p>
+                        <h3 className="mt-1 text-2xl font-black uppercase text-white">
+                          {aiGeneratedQuest.bossName}
+                        </h3>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="border border-rose-300/60 bg-rose-500/10 px-2 py-1 font-mono text-xs font-black text-rose-100">
+                          HP {aiGeneratedQuest.bossHp}
+                        </span>
+                        <span className="border border-cyan-300/60 bg-cyan-300/10 px-2 py-1 font-mono text-xs font-black text-cyan-100">
+                          +{aiGeneratedQuest.rewardXp} XP
+                        </span>
+                        <span className="border border-lime-300/60 bg-lime-300/10 px-2 py-1 font-mono text-xs font-black text-lime-100">
+                          +{aiGeneratedQuest.rewardCredits} CR
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {aiGeneratedQuest.subtasks.map((subtask, index) => (
+                        <div
+                          key={`${subtask}-${index}`}
+                          className="flex items-start gap-3 border border-fuchsia-300/30 bg-slate-950/70 p-3"
+                        >
+                          <span className="grid h-7 w-7 shrink-0 place-items-center border border-fuchsia-300 bg-fuchsia-300/10 font-mono text-xs font-black text-fuchsia-100">
+                            {index + 1}
+                          </span>
+                          <p className="text-sm font-black uppercase text-slate-100">
+                            {subtask}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAcceptGeneratedQuest}
+                      className="mt-4 inline-flex w-full items-center justify-center gap-2 border-2 border-lime-300 bg-lime-300 px-4 py-3 text-sm font-black uppercase text-slate-950 shadow-[0_0_30px_rgba(132,204,22,0.24)] transition hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-lime-200 focus:ring-offset-2 focus:ring-offset-slate-950"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      Aceptar Misión
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {aiError && (
+                <p className="relative mt-4 border border-rose-300/60 bg-rose-500/10 px-3 py-2 text-sm font-bold text-rose-100">
+                  {aiError}
+                </p>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isForgeModalOpen && (

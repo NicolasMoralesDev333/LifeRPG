@@ -91,3 +91,17 @@ El desafío técnico principal fue procesar un array plano de `activity_logs` y 
 Desde el punto de vista de retención, este sprint es importante porque le muestra al usuario que su esfuerzo tiene memoria. La gamificación no funciona solo por recompensas inmediatas; también necesita evidencia de avance a largo plazo. El Oráculo empieza a cumplir ese rol: convertir acciones pequeñas en una narrativa visual de crecimiento.
 
 El próximo paso lógico será persistir los `activity_logs` reales en Supabase, conectar el heatmap con datos históricos verdaderos y sumar filtros por tipo de actividad, atributo entrenado o periodo de tiempo.
+
+## Sprint 7: Inteligencia Artificial como Dungeon Master
+
+En este sprint empecé a integrar una capa de inteligencia generativa en LifeRPG con el Dungeon Master IA. La idea principal fue atacar un problema muy real: el síndrome de la página en blanco. Muchas veces tengo una meta clara en la cabeza, pero no sé cómo dividirla en pasos concretos, accionables y medibles. Ahí es donde la IA puede convertirse en un puente entre una intención grande y una misión jugable.
+
+Construí el Orbe del Oráculo como una interfaz tipo terminal/chat dentro de la Boss Arena. Desde ahí puedo escribir una meta general, como conseguir mi primer trabajo frontend, y pedirle al Dungeon Master que la transforme en un jefe épico con HP, recompensas y subtareas. La experiencia está diseñada para sentirse como una invocación dentro del juego, no como un formulario genérico.
+
+A nivel técnico, implementé `generateQuestFromAI(prompt)` como una función asíncrona mockeada, simulando una llamada real a un LLM con estado de carga. Mientras la respuesta se genera, la UI muestra el mensaje "El Dungeon Master está tejiendo tu destino...", reforzando la fantasía sin ocultar que hay una operación en progreso.
+
+También diseñé un prompt de sistema estricto para que la IA devuelva un JSON predecible. Esto es clave: React necesita poder mapear la respuesta sin romperse, así que la estructura esperada incluye `bossName`, `bossHp`, recompensas y un arreglo de `subtasks`. Aunque por ahora la respuesta está mockeada, el contrato ya queda preparado para conectar OpenAI, Gemini o cualquier backend propio más adelante.
+
+El resultado generado se muestra antes de aceptarlo. Si la misión tiene sentido, puedo presionar "Aceptar Misión" y el sistema inyecta automáticamente ese jefe en el estado de la aplicación, convirtiendo la meta abstracta en una Boss Fight jugable. Este sprint hace que LifeRPG empiece a sentirse menos como una app que espera datos y más como un compañero activo que ayuda a diseñar el camino.
+
+El próximo paso natural será mover esta simulación a una API real, proteger la key del proveedor en backend, validar el JSON con un schema estricto y guardar los bosses generados en Supabase para que formen parte de la partida persistente.
