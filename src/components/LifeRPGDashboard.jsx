@@ -65,8 +65,10 @@ const supabase = hasSupabaseConfig
 
 // Supabase placeholders:
 // life_rpg_profiles: user_id uuid PK, level int, xp int, xp_needed int, cyber_credits int, stats jsonb, updated_at timestamptz
-// life_rpg_habits: id text PK, user_id uuid, label text, stat text, xp int, created_at timestamptz
+// life_rpg_habits: id text PK, user_id uuid, label text, stat text, xp int, credits int, created_at timestamptz
 // life_rpg_rewards: id text PK, user_id uuid, name text, cost int, icon text, created_at timestamptz
+// life_rpg_bosses: id text PK, user_id uuid, name text, hp/rewards fields, created_at timestamptz
+// life_rpg_boss_subtasks: id text PK, boss_id text, user_id uuid, name text, damage int, credits int, position int
 // life_rpg_activity_logs: id text PK, user_id uuid, date date, type text, label text, value int, created_at timestamptz
 const PROFILE_TABLE = "life_rpg_profiles";
 const HABITS_TABLE = "life_rpg_habits";
@@ -583,6 +585,7 @@ function buildHabitRow(userId, habit) {
     label: habit.label,
     stat: habit.stat,
     xp: habit.xp,
+    credits: habit.credits,
     created_at: new Date().toISOString(),
   };
 }
@@ -1015,7 +1018,9 @@ export default function LifeRPGDashboard() {
   const syncPlayerData = useCallback(
     async (nextUserId) => {
       if (!supabase) {
-        showErrorToast("Faltan las variables NEXT_PUBLIC_SUPABASE_*.");
+        showErrorToast(
+          "Supabase no está configurado. Usá VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.",
+        );
         setIsLoading(false);
         return;
       }
@@ -1031,7 +1036,7 @@ export default function LifeRPGDashboard() {
             .maybeSingle(),
           supabase
             .from(HABITS_TABLE)
-            .select("id,label,stat,xp,created_at")
+            .select("id,label,stat,xp,credits,created_at")
             .eq("user_id", nextUserId)
             .order("created_at", { ascending: true }),
         ]);
@@ -1068,7 +1073,7 @@ export default function LifeRPGDashboard() {
           const { data, error } = await supabase
             .from(HABITS_TABLE)
             .insert(starterRows)
-            .select("id,label,stat,xp,created_at");
+            .select("id,label,stat,xp,credits,created_at");
 
           if (error) {
             throw error;
@@ -1101,7 +1106,10 @@ export default function LifeRPGDashboard() {
     let isMounted = true;
 
     if (!supabase) {
-      setAuthError("Faltan NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+      setAuthError("");
+      setAuthInfo(
+        "Modo demo activo. Para conectar Supabase real configurá VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.",
+      );
       setIsAuthLoading(false);
       return undefined;
     }
