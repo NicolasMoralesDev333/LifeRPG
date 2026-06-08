@@ -93,6 +93,12 @@ npm run preview
 npm run test:run
 ```
 
+## Calidad
+
+- CI con GitHub Actions en cada push y pull request a `main`.
+- `npm run test:run` valida reglas de gameplay y analíticas.
+- `npm run build` valida que el bundle de producción compile correctamente.
+
 ## Decisiones técnicas
 
 - Tailwind CSS permite iterar rápido una UI con identidad fuerte sin CSS externo.
