@@ -35,6 +35,7 @@ LifeRPG es un tracker de hábitos gamificado con estética Dark/Neon RPG. La ide
 - Modo demo local para desarrollo sin Supabase.
 - Carga diferida de El Oráculo para evitar cargar Recharts en el bundle inicial.
 - Metadatos web, favicon SVG y manifest PWA básico para deploy.
+- Tests unitarios de reglas de XP, level up, logs y rachas con Vitest.
 
 ## Arquitectura de datos
 
@@ -89,6 +90,7 @@ Más detalle en [`SUPABASE_SETUP.md`](./SUPABASE_SETUP.md).
 npm run dev
 npm run build
 npm run preview
+npm run test:run
 ```
 
 ## Decisiones técnicas
@@ -99,13 +101,14 @@ npm run preview
 - Los logs de actividad se modelan como eventos planos para poder alimentar analíticas.
 - La vista de analíticas se carga con `React.lazy` para reducir el peso inicial del dashboard.
 - El HTML base incluye descripción, Open Graph, theme color y manifest para que el deploy no se vea genérico.
+- La lógica pura de progresión y analíticas vive en `src/lib/gameplay.js`, testeada con Vitest.
 - El Dungeon Master IA está mockeado, pero la UI ya espera un contrato JSON estructurado.
 
 ## Roadmap de producción
 
 - Separar más secciones del componente principal en módulos pequeños.
 - Mover la IA a una API serverless para proteger la key del proveedor.
-- Agregar tests de flujos críticos.
+- Agregar tests de flujos críticos de UI.
 - Optimizar bundle con lazy loading para vistas pesadas como El Oráculo.
 - Crear una landing/case study dentro del portfolio.
 - Deploy final en Vercel con Supabase real.

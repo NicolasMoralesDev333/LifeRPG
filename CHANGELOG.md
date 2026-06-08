@@ -120,4 +120,6 @@ Además empecé el refactor de producción separando El Oráculo en un component
 
 También sumé metadatos web, favicon SVG y manifest PWA básico. Son detalles chicos, pero hacen que el proyecto se sienta cuidado cuando alguien abre el deploy, lo guarda en mobile o lo ve compartido como link.
 
+El siguiente ajuste fue separar lógica pura de gameplay en `src/lib/gameplay.js` y cubrirla con tests unitarios usando Vitest. Ahora las reglas de XP, los saltos de nivel, la construcción del historial de 30 días y el cálculo de rachas no dependen del componente React gigante. Esto mejora la confianza para seguir refactorizando sin miedo a romper la progresión.
+
 El siguiente paso antes del deploy será ordenar el componente principal en módulos más pequeños, agregar tests mínimos de flujos críticos y terminar la configuración real de Supabase/Vercel. Recién cuando esa base esté sólida quiero publicar el deploy final, para que el link del portfolio muestre una experiencia pulida y confiable.

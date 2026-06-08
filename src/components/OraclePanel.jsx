@@ -10,6 +10,10 @@ import {
   Tooltip,
 } from "recharts";
 import { BarChart3, CalendarDays, Coins } from "lucide-react";
+import {
+  buildThirtyDayActivity,
+  calculateCurrentStreak,
+} from "../lib/gameplay";
 
 const ORACLE_STATS = [
   { key: "str", label: "STR", name: "Fuerza" },
@@ -18,48 +22,6 @@ const ORACLE_STATS = [
   { key: "cha", label: "CHA", name: "Carisma" },
   { key: "agi", label: "AGI", name: "Agilidad" },
 ];
-
-function getDateKey(date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function buildThirtyDayActivity(logs) {
-  const today = new Date();
-  const groupedLogs = logs.reduce((grouped, log) => {
-    grouped.set(log.date, (grouped.get(log.date) ?? 0) + Number(log.value ?? 1));
-    return grouped;
-  }, new Map());
-
-  return Array.from({ length: 30 }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - (29 - index));
-    const dateKey = getDateKey(date);
-    const count = groupedLogs.get(dateKey) ?? 0;
-
-    return {
-      date: dateKey,
-      count,
-      day: date.toLocaleDateString("es-AR", {
-        day: "2-digit",
-        month: "2-digit",
-      }),
-    };
-  });
-}
-
-function calculateCurrentStreak(activityDays) {
-  let streak = 0;
-
-  for (let index = activityDays.length - 1; index >= 0; index -= 1) {
-    if (activityDays[index].count <= 0) {
-      break;
-    }
-
-    streak += 1;
-  }
-
-  return streak;
-}
 
 function getHeatLevelClass(count) {
   if (count >= 5) {

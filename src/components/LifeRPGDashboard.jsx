@@ -45,6 +45,11 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import {
+  calculateLevelProgress,
+  generateMockActivityLogs,
+  getDateKey,
+} from "../lib/gameplay";
 
 const OraclePanel = lazy(() => import("./OraclePanel"));
 
@@ -477,56 +482,6 @@ function createBossFromAIQuest(quest) {
       isCompleted: false,
     })),
   };
-}
-
-function getDateKey(date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function createSeedScore(seed) {
-  return Array.from(seed).reduce(
-    (score, char, index) => score + char.charCodeAt(0) * (index + 3),
-    0,
-  );
-}
-
-function generateMockActivityLogs(seed = DEMO_USER_ID) {
-  const seedScore = createSeedScore(seed);
-  const today = new Date();
-  const logs = [];
-
-  for (let offset = 29; offset >= 0; offset -= 1) {
-    const date = new Date(today);
-    date.setDate(today.getDate() - offset);
-    const dayScore = (seedScore + offset * 17 + date.getDate() * 11) % 7;
-    const completions = Math.max(0, dayScore - 1);
-
-    for (let index = 0; index < completions; index += 1) {
-      logs.push({
-        id: `mock-${getDateKey(date)}-${index}`,
-        date: getDateKey(date),
-        type: index % 3 === 0 ? "habit" : index % 3 === 1 ? "boss" : "focus",
-        label: index % 2 === 0 ? "Misión diaria" : "Ataque completado",
-        value: 1,
-      });
-    }
-  }
-
-  return logs;
-}
-
-function calculateLevelProgress(totalXp, currentNeeded) {
-  let nextXp = totalXp;
-  let nextNeeded = currentNeeded;
-  let levelsGained = 0;
-
-  while (nextXp >= nextNeeded) {
-    nextXp -= nextNeeded;
-    levelsGained += 1;
-    nextNeeded = Math.ceil(nextNeeded * 1.35);
-  }
-
-  return { nextXp, nextNeeded, levelsGained };
 }
 
 function findStatConfig(statKey) {
