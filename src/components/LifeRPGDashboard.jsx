@@ -72,6 +72,10 @@ const supabase = hasSupabaseConfig
 // life_rpg_activity_logs: id text PK, user_id uuid, date date, type text, label text, value int, created_at timestamptz
 const PROFILE_TABLE = "life_rpg_profiles";
 const HABITS_TABLE = "life_rpg_habits";
+const REWARDS_TABLE = "life_rpg_rewards";
+const BOSSES_TABLE = "life_rpg_bosses";
+const BOSS_SUBTASKS_TABLE = "life_rpg_boss_subtasks";
+const ACTIVITY_LOGS_TABLE = "life_rpg_activity_logs";
 const DEMO_USER_ID = "demo-user";
 const DEMO_CREDENTIALS = {
   email:
@@ -82,6 +86,15 @@ const DEMO_CREDENTIALS = {
     runtimeEnv.NEXT_PUBLIC_DEMO_PASSWORD ||
     runtimeEnv.VITE_DEMO_PASSWORD ||
     "demo1234",
+};
+
+const ICON_COMPONENTS = {
+  bot: Bot,
+  flame: Flame,
+  gift: Gift,
+  skull: Skull,
+  trophy: Trophy,
+  zap: Zap,
 };
 
 const INITIAL_STATS = {
@@ -235,6 +248,7 @@ const INITIAL_BOSSES = [
     currentHp: 320,
     rewardXp: 260,
     rewardCredits: 180,
+    icon: "skull",
     Icon: Skull,
     isDefeated: false,
     subtasks: [
@@ -275,6 +289,7 @@ const INITIAL_BOSSES = [
     currentHp: 240,
     rewardXp: 180,
     rewardCredits: 130,
+    icon: "flame",
     Icon: Flame,
     isDefeated: false,
     subtasks: [
@@ -320,18 +335,21 @@ const INITIAL_REWARDS = [
     id: "reward-pc-hour",
     name: "Jugar 1 hora en la PC",
     cost: 120,
+    icon: "gift",
     Icon: Gift,
   },
   {
     id: "reward-movie-night",
     name: "Noche de película",
     cost: 180,
+    icon: "trophy",
     Icon: Trophy,
   },
   {
     id: "reward-premium-coffee",
     name: "Café premium sin culpa",
     cost: 90,
+    icon: "zap",
     Icon: Zap,
   },
 ];
@@ -446,6 +464,7 @@ function createBossFromAIQuest(quest) {
     currentHp: bossHp,
     rewardXp: Number(quest.rewardXp ?? Math.round(bossHp * 0.62)),
     rewardCredits: Number(quest.rewardCredits ?? Math.round(bossHp * 0.38)),
+    icon: "bot",
     Icon: Bot,
     isDefeated: false,
     subtasks: safeSubtasks.map((name, index) => ({
@@ -594,6 +613,127 @@ function buildHabitRow(userId, habit) {
     credits: habit.credits,
     created_at: new Date().toISOString(),
   };
+}
+
+function decorateReward(row) {
+  const icon = row.icon ?? "gift";
+  const Icon = ICON_COMPONENTS[icon] ?? Gift;
+
+  return {
+    id: row.id,
+    name: row.name,
+    cost: Number(row.cost),
+    icon,
+    Icon,
+  };
+}
+
+function buildRewardRow(userId, reward) {
+  return {
+    id: reward.id,
+    user_id: userId,
+    name: reward.name,
+    cost: Number(reward.cost),
+    icon: reward.icon ?? "gift",
+    created_at: new Date().toISOString(),
+  };
+}
+
+function decorateBossSubtask(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    damage: Number(row.damage),
+    credits: Number(row.credits ?? Math.max(8, Math.round(row.damage / 3))),
+    isCompleted: Boolean(row.is_completed),
+  };
+}
+
+function buildBossSubtaskRows(userId, boss) {
+  return boss.subtasks.map((subtask, index) => ({
+    id: subtask.id,
+    boss_id: boss.id,
+    user_id: userId,
+    name: subtask.name,
+    damage: Number(subtask.damage),
+    credits: Number(
+      subtask.credits ?? Math.max(8, Math.round(Number(subtask.damage) / 3)),
+    ),
+    is_completed: Boolean(subtask.isCompleted),
+    position: index,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }));
+}
+
+function decorateBoss(row, subtaskRows = []) {
+  const icon = row.icon ?? "skull";
+  const Icon = ICON_COMPONENTS[icon] ?? Skull;
+
+  return {
+    id: row.id,
+    name: row.name,
+    totalHp: Number(row.total_hp),
+    currentHp: Number(row.current_hp),
+    rewardXp: Number(row.reward_xp ?? 0),
+    rewardCredits: Number(row.reward_credits ?? 0),
+    icon,
+    Icon,
+    isDefeated: Boolean(row.is_defeated),
+    subtasks: subtaskRows
+      .slice()
+      .sort((left, right) => Number(left.position) - Number(right.position))
+      .map(decorateBossSubtask),
+  };
+}
+
+function buildBossRow(userId, boss) {
+  return {
+    id: boss.id,
+    user_id: userId,
+    name: boss.name,
+    total_hp: Number(boss.totalHp),
+    current_hp: Number(boss.currentHp),
+    reward_xp: Number(boss.rewardXp ?? 0),
+    reward_credits: Number(boss.rewardCredits ?? 0),
+    icon: boss.icon ?? "skull",
+    is_defeated: Boolean(boss.isDefeated),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function decorateActivityLog(row) {
+  return {
+    id: row.id,
+    date: row.activity_date ?? row.date,
+    type: row.type,
+    label: row.label,
+    value: Number(row.value ?? 1),
+  };
+}
+
+function buildActivityLogRow(userId, log) {
+  return {
+    id: log.id,
+    user_id: userId,
+    activity_date: log.date ?? getDateKey(new Date()),
+    type: log.type,
+    label: log.label,
+    value: Number(log.value ?? 1),
+    created_at: new Date().toISOString(),
+  };
+}
+
+function createStarterBosses() {
+  return INITIAL_BOSSES.map((boss) => ({
+    ...boss,
+    id: createClientId("starter-boss"),
+    subtasks: boss.subtasks.map((subtask) => ({
+      ...subtask,
+      id: createClientId("starter-attack"),
+    })),
+  }));
 }
 
 function normalizePlayerProfile(profile) {
@@ -971,18 +1111,36 @@ export default function LifeRPGDashboard() {
     [showToast],
   );
 
-  const appendActivityLog = useCallback((type, label, value = 1) => {
-    setActivityLogs((currentLogs) => [
-      ...currentLogs,
-      {
+  const appendActivityLog = useCallback(
+    (type, label, value = 1) => {
+      const nextLog = {
         id: createClientId("activity"),
         date: getDateKey(new Date()),
         type,
         label,
         value,
-      },
-    ]);
-  }, []);
+      };
+
+      setActivityLogs((currentLogs) => [...currentLogs, nextLog]);
+
+      if (isDemoSession || !supabase || !userId) {
+        return;
+      }
+
+      supabase
+        .from(ACTIVITY_LOGS_TABLE)
+        .insert(buildActivityLogRow(userId, nextLog))
+        .then(({ error }) => {
+          if (error) {
+            setActivityLogs((currentLogs) =>
+              currentLogs.filter((log) => log.id !== nextLog.id),
+            );
+            showErrorToast("No pude guardar el log de actividad.");
+          }
+        });
+    },
+    [isDemoSession, showErrorToast, userId],
+  );
 
   const statRows = useMemo(
     () =>
@@ -1034,7 +1192,14 @@ export default function LifeRPGDashboard() {
       setIsLoading(true);
 
       try {
-        const [profileResponse, habitsResponse] = await Promise.all([
+        const [
+          profileResponse,
+          habitsResponse,
+          rewardsResponse,
+          bossesResponse,
+          subtasksResponse,
+          activityResponse,
+        ] = await Promise.all([
           supabase
             .from(PROFILE_TABLE)
             .select("level,xp,xp_needed,cyber_credits,stats")
@@ -1045,6 +1210,31 @@ export default function LifeRPGDashboard() {
             .select("id,label,stat,xp,credits,created_at")
             .eq("user_id", nextUserId)
             .order("created_at", { ascending: true }),
+          supabase
+            .from(REWARDS_TABLE)
+            .select("id,name,cost,icon,created_at")
+            .eq("user_id", nextUserId)
+            .order("created_at", { ascending: true }),
+          supabase
+            .from(BOSSES_TABLE)
+            .select(
+              "id,name,total_hp,current_hp,reward_xp,reward_credits,icon,is_defeated,created_at",
+            )
+            .eq("user_id", nextUserId)
+            .order("created_at", { ascending: true }),
+          supabase
+            .from(BOSS_SUBTASKS_TABLE)
+            .select(
+              "id,boss_id,name,damage,credits,is_completed,position,created_at",
+            )
+            .eq("user_id", nextUserId)
+            .order("position", { ascending: true }),
+          supabase
+            .from(ACTIVITY_LOGS_TABLE)
+            .select("id,activity_date,type,label,value,created_at")
+            .eq("user_id", nextUserId)
+            .gte("activity_date", getDateKey(new Date(Date.now() - 29 * 864e5)))
+            .order("activity_date", { ascending: true }),
         ]);
 
         if (profileResponse.error) {
@@ -1055,8 +1245,28 @@ export default function LifeRPGDashboard() {
           throw habitsResponse.error;
         }
 
+        if (rewardsResponse.error) {
+          throw rewardsResponse.error;
+        }
+
+        if (bossesResponse.error) {
+          throw bossesResponse.error;
+        }
+
+        if (subtasksResponse.error) {
+          throw subtasksResponse.error;
+        }
+
+        if (activityResponse.error) {
+          throw activityResponse.error;
+        }
+
         const nextPlayer = normalizePlayerProfile(profileResponse.data);
         let remoteHabitRows = habitsResponse.data ?? [];
+        let remoteRewardRows = rewardsResponse.data ?? [];
+        let remoteBossRows = bossesResponse.data ?? [];
+        let remoteSubtaskRows = subtasksResponse.data ?? [];
+        const remoteActivityRows = activityResponse.data ?? [];
 
         if (!profileResponse.data) {
           const { error } = await supabase
@@ -1088,9 +1298,75 @@ export default function LifeRPGDashboard() {
           remoteHabitRows = data ?? starterRows;
         }
 
+        if (remoteRewardRows.length === 0) {
+          const starterRows = INITIAL_REWARDS.map((reward) =>
+            buildRewardRow(nextUserId, {
+              ...reward,
+              id: createClientId("starter-reward"),
+            }),
+          );
+
+          const { data, error } = await supabase
+            .from(REWARDS_TABLE)
+            .insert(starterRows)
+            .select("id,name,cost,icon,created_at");
+
+          if (error) {
+            throw error;
+          }
+
+          remoteRewardRows = data ?? starterRows;
+        }
+
+        if (remoteBossRows.length === 0) {
+          const starterBosses = createStarterBosses();
+          const starterBossRows = starterBosses.map((boss) =>
+            buildBossRow(nextUserId, boss),
+          );
+          const starterSubtaskRows = starterBosses.flatMap((boss) =>
+            buildBossSubtaskRows(nextUserId, boss),
+          );
+
+          const { data: insertedBosses, error: bossError } = await supabase
+            .from(BOSSES_TABLE)
+            .insert(starterBossRows)
+            .select(
+              "id,name,total_hp,current_hp,reward_xp,reward_credits,icon,is_defeated,created_at",
+            );
+
+          if (bossError) {
+            throw bossError;
+          }
+
+          const { data: insertedSubtasks, error: subtaskError } = await supabase
+            .from(BOSS_SUBTASKS_TABLE)
+            .insert(starterSubtaskRows)
+            .select(
+              "id,boss_id,name,damage,credits,is_completed,position,created_at",
+            );
+
+          if (subtaskError) {
+            throw subtaskError;
+          }
+
+          remoteBossRows = insertedBosses ?? starterBossRows;
+          remoteSubtaskRows = insertedSubtasks ?? starterSubtaskRows;
+        }
+
         setPlayer(nextPlayer);
         setHabits(remoteHabitRows.map(decorateHabit));
-        setActivityLogs(generateMockActivityLogs(nextUserId));
+        setBlackMarketRewards(remoteRewardRows.map(decorateReward));
+        setBosses(
+          remoteBossRows.map((bossRow) =>
+            decorateBoss(
+              bossRow,
+              remoteSubtaskRows.filter(
+                (subtaskRow) => subtaskRow.boss_id === bossRow.id,
+              ),
+            ),
+          ),
+        );
+        setActivityLogs(remoteActivityRows.map(decorateActivityLog));
         setLastAction("Partida sincronizada");
       } catch {
         setPlayer(INITIAL_PLAYER);
@@ -1407,6 +1683,7 @@ export default function LifeRPGDashboard() {
     const attackCredits = Number(
       subtask.credits ?? Math.max(8, Math.round(subtask.damage / 3)),
     );
+    const previousBosses = bosses;
 
     setBosses((currentBosses) =>
       currentBosses.map((currentBoss) => {
@@ -1463,6 +1740,35 @@ export default function LifeRPGDashboard() {
     } else {
       grantCyberCredits(attackCredits, `Ataque: ${subtask.name}`);
     }
+
+    if (isDemoSession || !supabase || !userId) {
+      return;
+    }
+
+    Promise.all([
+      supabase
+        .from(BOSSES_TABLE)
+        .update({
+          current_hp: nextHp,
+          is_defeated: isDefeated,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId)
+        .eq("id", bossId),
+      supabase
+        .from(BOSS_SUBTASKS_TABLE)
+        .update({
+          is_completed: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId)
+        .eq("id", subtaskId),
+    ]).then(([bossResponse, subtaskResponse]) => {
+      if (bossResponse.error || subtaskResponse.error) {
+        setBosses(previousBosses);
+        showErrorToast("No pude guardar el ataque contra el boss.");
+      }
+    });
   };
 
   const openForgeModal = () => {
@@ -1532,6 +1838,11 @@ export default function LifeRPGDashboard() {
       return;
     }
 
+    if (!userId) {
+      showErrorToast("No hay sesión activa para guardar el boss.");
+      return;
+    }
+
     const aiBoss = createBossFromAIQuest(aiGeneratedQuest);
 
     setBosses((currentBosses) => [aiBoss, ...currentBosses]);
@@ -1539,6 +1850,24 @@ export default function LifeRPGDashboard() {
     setLastAction(`Misión IA aceptada: ${aiBoss.name}`);
     showSuccessToast(`Boss invocado: ${aiBoss.name}`);
     closeDungeonMasterModal();
+
+    if (isDemoSession || !supabase) {
+      return;
+    }
+
+    Promise.all([
+      supabase.from(BOSSES_TABLE).insert(buildBossRow(userId, aiBoss)),
+      supabase
+        .from(BOSS_SUBTASKS_TABLE)
+        .insert(buildBossSubtaskRows(userId, aiBoss)),
+    ]).then(([bossResponse, subtasksResponse]) => {
+      if (bossResponse.error || subtasksResponse.error) {
+        setBosses((currentBosses) =>
+          currentBosses.filter((boss) => boss.id !== aiBoss.id),
+        );
+        showErrorToast("No pude guardar el boss generado por IA.");
+      }
+    });
   };
 
   const handleCreateHabit = (event) => {
@@ -1649,10 +1978,21 @@ export default function LifeRPGDashboard() {
       return;
     }
 
+    if (!userId) {
+      showErrorToast("No hay sesión activa para guardar la recompensa.");
+      return;
+    }
+
+    if (!supabase && !isDemoSession) {
+      showErrorToast("Supabase no está configurado para guardar recompensas.");
+      return;
+    }
+
     const newReward = {
       id: createClientId("reward"),
       name: rewardName,
       cost: Math.round(rewardCost),
+      icon: "gift",
       Icon: Gift,
     };
 
@@ -1661,15 +2001,59 @@ export default function LifeRPGDashboard() {
     setRewardFormError("");
     setLastAction(`Ítem registrado: ${rewardName}`);
     showSuccessToast(`Nuevo ítem en Mercado Negro: ${rewardName}`);
+
+    if (isDemoSession || !supabase) {
+      return;
+    }
+
+    supabase
+      .from(REWARDS_TABLE)
+      .insert(buildRewardRow(userId, newReward))
+      .then(({ error }) => {
+        if (error) {
+          setBlackMarketRewards((currentRewards) =>
+            currentRewards.filter((reward) => reward.id !== newReward.id),
+          );
+          showErrorToast("No pude guardar la recompensa.");
+        }
+      });
   };
 
   const handleDeleteReward = (event, rewardId, rewardName) => {
     event.stopPropagation();
 
+    if (!userId) {
+      showErrorToast("No hay sesión activa para borrar la recompensa.");
+      return;
+    }
+
     setBlackMarketRewards((currentRewards) =>
       currentRewards.filter((reward) => reward.id !== rewardId),
     );
     setLastAction(`Ítem retirado: ${rewardName}`);
+
+    if (isDemoSession || !supabase) {
+      return;
+    }
+
+    const rewardToRestore = blackMarketRewards.find(
+      (reward) => reward.id === rewardId,
+    );
+
+    supabase
+      .from(REWARDS_TABLE)
+      .delete()
+      .eq("user_id", userId)
+      .eq("id", rewardId)
+      .then(({ error }) => {
+        if (error && rewardToRestore) {
+          setBlackMarketRewards((currentRewards) => [
+            ...currentRewards,
+            rewardToRestore,
+          ]);
+          showErrorToast("No pude borrar la recompensa.");
+        }
+      });
   };
 
   const handleBuyReward = (reward) => {
@@ -1696,6 +2080,7 @@ export default function LifeRPGDashboard() {
     setPlayer(nextPlayer);
     setLastAction(`Gastaste ${reward.cost} CR en: ${reward.name}`);
     showSuccessToast(`Recompensa Desbloqueada: ${reward.name}`);
+    appendActivityLog("reward", `Gastaste ${reward.cost} CR en ${reward.name}`);
 
     persistPlayer(nextPlayer).then((wasSaved) => {
       if (!wasSaved) {

@@ -105,3 +105,15 @@ También diseñé un prompt de sistema estricto para que la IA devuelva un JSON 
 El resultado generado se muestra antes de aceptarlo. Si la misión tiene sentido, puedo presionar "Aceptar Misión" y el sistema inyecta automáticamente ese jefe en el estado de la aplicación, convirtiendo la meta abstracta en una Boss Fight jugable. Este sprint hace que LifeRPG empiece a sentirse menos como una app que espera datos y más como un compañero activo que ayuda a diseñar el camino.
 
 El próximo paso natural será mover esta simulación a una API real, proteger la key del proveedor en backend, validar el JSON con un schema estricto y guardar los bosses generados en Supabase para que formen parte de la partida persistente.
+
+## Sprint 8: Production Readiness (Camino al Portfolio)
+
+En este sprint empecé a preparar LifeRPG para dejar de ser solamente un prototipo atractivo y convertirse en un proyecto presentable para portfolio. El foco no estuvo en sumar más features por acumulación, sino en fortalecer la base técnica que una empresa esperaría ver: persistencia más completa, documentación clara y una historia de producto fácil de entender.
+
+El avance más importante fue extender la sincronización con Supabase. Hasta este punto la nube guardaba el perfil del jugador y sus hábitos, pero varias piezas potentes del juego todavía vivían como estado local. En este sprint conecté también el Mercado Negro, los Boss Fights, las subtareas y los logs de actividad. Esto hace que la economía, los proyectos largos y las analíticas empiecen a comportarse como una partida real y no como una demo aislada.
+
+A nivel técnico trabajé sobre el problema de serializar datos de UI. Los íconos de Lucide son componentes React, pero la base de datos necesita valores simples y persistibles. Para resolverlo agregué claves de ícono en texto y funciones de mapeo que transforman filas de Supabase en objetos listos para renderizar. Este patrón mantiene separada la representación visual de la estructura persistida.
+
+También preparé un README con enfoque de portfolio. Quiero que quien vea el repositorio pueda entender rápido qué problema resuelve LifeRPG, qué stack usa, qué features incluye, cómo se configura Supabase y por qué las decisiones técnicas tienen sentido. La documentación empieza a contar el proyecto como producto, no solo como código.
+
+El siguiente paso antes del deploy será ordenar el componente principal en módulos más pequeños, agregar tests mínimos de flujos críticos y terminar la configuración real de Supabase/Vercel. Recién cuando esa base esté sólida quiero publicar el deploy final, para que el link del portfolio muestre una experiencia pulida y confiable.
