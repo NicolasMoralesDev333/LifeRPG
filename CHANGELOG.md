@@ -118,4 +118,6 @@ También preparé un README con enfoque de portfolio. Quiero que quien vea el re
 
 Además empecé el refactor de producción separando El Oráculo en un componente propio cargado con `React.lazy`. Esta decisión reduce el peso inicial del dashboard porque Recharts solo se descarga cuando entro a la vista de analíticas. Es una mejora pequeña en arquitectura, pero importante para mostrar criterio de performance antes del deploy.
 
+También sumé metadatos web, favicon SVG y manifest PWA básico. Son detalles chicos, pero hacen que el proyecto se sienta cuidado cuando alguien abre el deploy, lo guarda en mobile o lo ve compartido como link.
+
 El siguiente paso antes del deploy será ordenar el componente principal en módulos más pequeños, agregar tests mínimos de flujos críticos y terminar la configuración real de Supabase/Vercel. Recién cuando esa base esté sólida quiero publicar el deploy final, para que el link del portfolio muestre una experiencia pulida y confiable.
