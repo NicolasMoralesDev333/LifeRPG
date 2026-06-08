@@ -74,8 +74,14 @@ const PROFILE_TABLE = "life_rpg_profiles";
 const HABITS_TABLE = "life_rpg_habits";
 const DEMO_USER_ID = "demo-user";
 const DEMO_CREDENTIALS = {
-  email: "demo@liferpg.local",
-  password: "demo1234",
+  email:
+    runtimeEnv.NEXT_PUBLIC_DEMO_EMAIL ||
+    runtimeEnv.VITE_DEMO_EMAIL ||
+    "demo@liferpg.local",
+  password:
+    runtimeEnv.NEXT_PUBLIC_DEMO_PASSWORD ||
+    runtimeEnv.VITE_DEMO_PASSWORD ||
+    "demo1234",
 };
 
 const INITIAL_STATS = {

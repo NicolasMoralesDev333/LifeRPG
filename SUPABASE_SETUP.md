@@ -20,6 +20,15 @@ VITE_SUPABASE_ANON_KEY=your-public-anon-key
 
 `VITE_*` es obligatorio porque este MVP corre con Vite. Las variables `NEXT_PUBLIC_*` solo son necesarias si más adelante movés el componente a Next.js.
 
+Para el modo demo local, también podés definir credenciales de prueba en `.env.local`:
+
+```env
+VITE_DEMO_EMAIL=demo@liferpg.local
+VITE_DEMO_PASSWORD=demo1234
+```
+
+Estas credenciales son solo para el fallback local cuando Supabase no está configurado. No las subo al repositorio y no reemplazan la autenticación real.
+
 ## 3. Base de datos
 
 En Supabase, abrir `SQL Editor` y ejecutar el contenido de:
@@ -45,6 +54,9 @@ Para probar rápido:
 1. Ir a `Authentication > Providers > Email`.
 2. Activar Email.
 3. Si querés evitar confirmación por mail durante desarrollo, desactivar temporalmente `Confirm email`.
+4. Crear el usuario de prueba desde `Authentication > Users > Add user`, o registrarlo desde la pantalla de título de LifeRPG.
+
+Si configurás un email y contraseña reales, esas credenciales deben vivir en Supabase Auth. El fallback demo local solo sirve cuando todavía no hay `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
 
 ## 5. Reiniciar local
 
