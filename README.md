@@ -33,6 +33,7 @@ LifeRPG es un tracker de hábitos gamificado con estética Dark/Neon RPG. La ide
 - Dungeon Master IA mockeado para convertir metas en bosses jugables.
 - Persistencia Supabase para perfil, hábitos, recompensas, bosses, subtareas y logs.
 - Modo demo local para desarrollo sin Supabase.
+- Carga diferida de El Oráculo para evitar cargar Recharts en el bundle inicial.
 
 ## Arquitectura de datos
 
@@ -95,11 +96,12 @@ npm run preview
 - Supabase acelera auth, persistencia y políticas RLS sobre Postgres.
 - Las mutaciones críticas usan UI optimista para mantener sensación de juego.
 - Los logs de actividad se modelan como eventos planos para poder alimentar analíticas.
+- La vista de analíticas se carga con `React.lazy` para reducir el peso inicial del dashboard.
 - El Dungeon Master IA está mockeado, pero la UI ya espera un contrato JSON estructurado.
 
 ## Roadmap de producción
 
-- Separar el componente principal en módulos más pequeños.
+- Separar más secciones del componente principal en módulos pequeños.
 - Mover la IA a una API serverless para proteger la key del proveedor.
 - Agregar tests de flujos críticos.
 - Optimizar bundle con lazy loading para vistas pesadas como El Oráculo.

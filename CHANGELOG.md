@@ -116,4 +116,6 @@ A nivel técnico trabajé sobre el problema de serializar datos de UI. Los ícon
 
 También preparé un README con enfoque de portfolio. Quiero que quien vea el repositorio pueda entender rápido qué problema resuelve LifeRPG, qué stack usa, qué features incluye, cómo se configura Supabase y por qué las decisiones técnicas tienen sentido. La documentación empieza a contar el proyecto como producto, no solo como código.
 
+Además empecé el refactor de producción separando El Oráculo en un componente propio cargado con `React.lazy`. Esta decisión reduce el peso inicial del dashboard porque Recharts solo se descarga cuando entro a la vista de analíticas. Es una mejora pequeña en arquitectura, pero importante para mostrar criterio de performance antes del deploy.
+
 El siguiente paso antes del deploy será ordenar el componente principal en módulos más pequeños, agregar tests mínimos de flujos críticos y terminar la configuración real de Supabase/Vercel. Recién cuando esa base esté sólida quiero publicar el deploy final, para que el link del portfolio muestre una experiencia pulida y confiable.
