@@ -35,7 +35,6 @@ import {
   ShoppingBag,
   Skull,
   Sparkles,
-  Swords,
   Terminal,
   Trash2,
   WandSparkles,
@@ -49,6 +48,7 @@ import {
   getDateKey,
 } from "../lib/gameplay";
 import AuthScreen, { AuthLoadingScreen } from "./AuthScreen";
+import BossArena from "./BossArena";
 
 const OraclePanel = lazy(() => import("./OraclePanel"));
 
@@ -725,11 +725,6 @@ export default function LifeRPGDashboard() {
   const selectedStat = findStatConfig(missionDraft.stat);
   const selectedDifficulty = findDifficultyConfig(missionDraft.difficulty);
   const activeBoss = bosses.find((boss) => !boss.isDefeated) ?? null;
-  const ActiveBossIcon = activeBoss?.Icon ?? Skull;
-  const bossHpPercent = activeBoss
-    ? Math.max((activeBoss.currentHp / activeBoss.totalHp) * 100, 0)
-    : 0;
-  const isBossEnraged = bossHpPercent <= 50;
 
   const showToast = useCallback((message, type = "error") => {
     const toastId = createClientId("toast");
@@ -1527,6 +1522,63 @@ export default function LifeRPGDashboard() {
     });
   };
 
+  const handleCreateBoss = (bossDraft) => {
+    if (!userId) {
+      showErrorToast("No hay sesión activa para guardar el boss.");
+      return false;
+    }
+
+    if (!supabase && !isDemoSession) {
+      showErrorToast("Supabase no está configurado para guardar bosses.");
+      return false;
+    }
+
+    const bossIcon = bossDraft.icon ?? "skull";
+    const newBoss = {
+      id: createClientId("boss"),
+      name: bossDraft.name,
+      totalHp: bossDraft.totalHp,
+      currentHp: bossDraft.totalHp,
+      rewardXp: bossDraft.rewardXp,
+      rewardCredits: bossDraft.rewardCredits,
+      icon: bossIcon,
+      Icon: ICON_COMPONENTS[bossIcon] ?? Skull,
+      isDefeated: false,
+      subtasks: bossDraft.subtasks.map((subtask, index) => ({
+        id: createClientId(`boss-attack-${index}`),
+        name: subtask.name,
+        damage: subtask.damage,
+        credits: subtask.credits,
+        isCompleted: false,
+      })),
+    };
+
+    setBosses((currentBosses) => [newBoss, ...currentBosses]);
+    appendActivityLog("boss-forge", newBoss.name);
+    setLastAction(`Boss forjado: ${newBoss.name}`);
+    showSuccessToast(`Nuevo boss activo: ${newBoss.name}`);
+
+    if (isDemoSession || !supabase) {
+      return true;
+    }
+
+    Promise.all([
+      supabase.from(BOSSES_TABLE).insert(buildBossRow(userId, newBoss)),
+      supabase
+        .from(BOSS_SUBTASKS_TABLE)
+        .insert(buildBossSubtaskRows(userId, newBoss)),
+    ]).then(([bossResponse, subtasksResponse]) => {
+      if (bossResponse.error || subtasksResponse.error) {
+        setBosses((currentBosses) =>
+          currentBosses.filter((boss) => boss.id !== newBoss.id),
+        );
+        showErrorToast("No pude guardar el boss personalizado.");
+      }
+    });
+
+    return true;
+  };
+
   const handleCreateHabit = (event) => {
     event.preventDefault();
 
@@ -2198,166 +2250,13 @@ export default function LifeRPGDashboard() {
           </motion.section>
         </div>
 
-        <motion.section
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.45, ease: "easeOut" }}
-          className="relative overflow-hidden border-4 border-rose-700/80 bg-slate-950/[0.92] p-4 shadow-[0_0_52px_rgba(225,29,72,0.18)] [clip-path:polygon(0_0,calc(100%-24px)_0,100%_24px,100%_calc(100%-16px),calc(100%-16px)_100%,20px_100%,0_calc(100%-20px))] sm:p-5"
-        >
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(225,29,72,0.24),transparent_34%),linear-gradient(135deg,rgba(127,29,29,0.28),transparent_34%,rgba(250,204,21,0.08)_78%,transparent)]" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-rose-600 via-red-500 to-yellow-200" />
-
-          {activeBoss ? (
-            <div className="relative grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="flex items-center gap-2 text-xs font-black uppercase text-rose-200">
-                      <Skull className="h-4 w-4" />
-                      Boss Arena
-                    </p>
-                    <h2 className="mt-1 text-3xl font-black uppercase text-white sm:text-4xl">
-                      {activeBoss.name}
-                    </h2>
-                    <motion.button
-                      type="button"
-                      onClick={openDungeonMasterModal}
-                      whileHover={{ scale: 1.02, y: -1 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="mt-4 inline-flex items-center gap-2 border-2 border-fuchsia-300 bg-fuchsia-300/10 px-3 py-2 text-xs font-black uppercase text-fuchsia-100 shadow-[0_0_28px_rgba(217,70,239,0.2)] transition hover:border-cyan-200 hover:bg-cyan-300/15 hover:text-cyan-100 focus:outline-none focus:ring-2 focus:ring-fuchsia-200 focus:ring-offset-2 focus:ring-offset-slate-950"
-                    >
-                      <WandSparkles className="h-4 w-4 animate-pulse" />
-                      Consultar al Dungeon Master (IA)
-                    </motion.button>
-                  </div>
-                  <div className="grid h-16 w-16 shrink-0 place-items-center border-2 border-rose-400 bg-rose-500/10 shadow-[0_0_28px_rgba(225,29,72,0.28)] [clip-path:polygon(50%_0,100%_25%,100%_76%,50%_100%,0_76%,0_25%)]">
-                    <ActiveBossIcon className="h-8 w-8 text-rose-100 drop-shadow-[0_0_12px_rgba(251,113,133,0.8)]" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-2 flex items-end justify-between gap-3">
-                    <p className="font-mono text-xs font-black uppercase text-rose-200">
-                      HP del jefe
-                    </p>
-                    <p className="font-mono text-sm font-black text-white">
-                      {activeBoss.currentHp} / {activeBoss.totalHp}
-                    </p>
-                  </div>
-
-                  <div className="relative h-12 overflow-hidden border-2 border-rose-300 bg-slate-950 shadow-[0_0_28px_rgba(225,29,72,0.22)] [clip-path:polygon(0_0,calc(100%-14px)_0,100%_14px,100%_100%,14px_100%,0_calc(100%-14px))]">
-                    <motion.div
-                      className={`absolute inset-y-0 left-0 ${
-                        isBossEnraged
-                          ? "animate-pulse bg-gradient-to-r from-red-950 via-red-700 to-orange-600"
-                          : "bg-gradient-to-r from-red-500 via-rose-600 to-fuchsia-800"
-                      } shadow-[0_0_34px_rgba(225,29,72,0.6)]`}
-                      animate={{ width: `${bossHpPercent}%` }}
-                      transition={{ duration: 0.42, ease: "easeOut" }}
-                    />
-                    <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.18)_0,transparent_18%,transparent_52%,rgba(255,255,255,0.12)_54%,transparent_72%)]" />
-                    <AnimatePresence>
-                      {damageBursts.map((burst, index) => (
-                        <motion.div
-                          key={burst.id}
-                          initial={{ opacity: 0, y: 18, scale: 0.88 }}
-                          animate={{
-                            opacity: 1,
-                            y: -28 - index * 6,
-                            scale: 1,
-                          }}
-                          exit={{ opacity: 0, y: -56, scale: 0.9 }}
-                          className="pointer-events-none absolute right-5 top-2 font-mono text-lg font-black text-red-100 drop-shadow-[0_0_12px_rgba(248,113,113,0.95)]"
-                        >
-                          -{burst.damage} HP
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <span className="border border-yellow-200/60 bg-yellow-200/10 px-2 py-1 font-mono text-xs font-black text-yellow-100">
-                    REWARD +{activeBoss.rewardXp} XP
-                  </span>
-                  <span className="inline-flex items-center gap-1 border border-lime-300/60 bg-lime-300/10 px-2 py-1 font-mono text-xs font-black text-lime-100">
-                    <Coins className="h-3.5 w-3.5" />
-                    BOUNTY +{activeBoss.rewardCredits} CR
-                  </span>
-                  <span className="border border-rose-300/60 bg-rose-500/10 px-2 py-1 font-mono text-xs font-black text-rose-100">
-                    {activeBoss.subtasks.filter((subtask) => subtask.isCompleted).length}
-                    /{activeBoss.subtasks.length} ATAQUES
-                  </span>
-                </div>
-              </div>
-
-              <div className="relative space-y-3">
-                {activeBoss.subtasks.map((subtask) => (
-                  <motion.button
-                    key={subtask.id}
-                    type="button"
-                    whileHover={subtask.isCompleted ? undefined : { x: 4 }}
-                    whileTap={subtask.isCompleted ? undefined : { scale: 0.98 }}
-                    disabled={subtask.isCompleted}
-                    onClick={() => handleBossAttack(activeBoss.id, subtask.id)}
-                    className={`group flex w-full items-center justify-between gap-4 border-2 p-3 text-left transition [clip-path:polygon(0_0,calc(100%-12px)_0,100%_12px,100%_100%,12px_100%,0_calc(100%-12px))] focus:outline-none focus:ring-2 focus:ring-rose-200 focus:ring-offset-2 focus:ring-offset-slate-950 ${
-                      subtask.isCompleted
-                        ? "border-lime-300/50 bg-lime-300/10 text-lime-100"
-                        : "border-rose-400/70 bg-rose-950/40 text-white hover:border-yellow-200 hover:bg-rose-900/60 hover:shadow-[0_0_28px_rgba(225,29,72,0.24)]"
-                    }`}
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span
-                        className={`grid h-8 w-8 shrink-0 place-items-center border font-mono text-xs font-black ${
-                          subtask.isCompleted
-                            ? "border-lime-300 bg-lime-300/20 text-lime-100"
-                            : "border-rose-300 bg-slate-950 text-rose-100 group-hover:border-yellow-200 group-hover:text-yellow-100"
-                        }`}
-                      >
-                        {subtask.isCompleted ? "OK" : "ATK"}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="break-words text-sm font-black uppercase">
-                          {subtask.name}
-                        </p>
-                        <p className="font-mono text-xs font-black text-rose-200">
-                          DAMAGE {subtask.damage}
-                        </p>
-                        <p className="font-mono text-xs font-black text-lime-200">
-                          LOOT +{subtask.credits} CR
-                        </p>
-                      </div>
-                    </div>
-                    <Swords className="h-5 w-5 shrink-0 text-rose-100 group-hover:text-yellow-100" />
-                  </motion.button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="relative flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="flex items-center gap-2 text-xs font-black uppercase text-yellow-100">
-                  <Trophy className="h-4 w-4" />
-                  Arena despejada
-                </p>
-                <h2 className="mt-1 text-2xl font-black uppercase text-white">
-                  Todos los jefes fueron derrotados
-                </h2>
-              </div>
-              <span className="border border-lime-300/60 bg-lime-300/10 px-3 py-2 font-mono text-xs font-black uppercase text-lime-100">
-                PROJECT CLEAR
-              </span>
-              <button
-                type="button"
-                onClick={openDungeonMasterModal}
-                className="inline-flex items-center gap-2 border-2 border-fuchsia-300 bg-fuchsia-300/10 px-3 py-2 text-xs font-black uppercase text-fuchsia-100 shadow-[0_0_28px_rgba(217,70,239,0.2)] transition hover:border-cyan-200 hover:bg-cyan-300/15 hover:text-cyan-100 focus:outline-none focus:ring-2 focus:ring-fuchsia-200 focus:ring-offset-2 focus:ring-offset-slate-950"
-              >
-                <WandSparkles className="h-4 w-4 animate-pulse" />
-                Consultar al Dungeon Master (IA)
-              </button>
-            </div>
-          )}
-        </motion.section>
+        <BossArena
+          activeBoss={activeBoss}
+          damageBursts={damageBursts}
+          onAttack={handleBossAttack}
+          onCreateBoss={handleCreateBoss}
+          onOpenDungeonMaster={openDungeonMasterModal}
+        />
 
         <motion.section
           initial={{ opacity: 0, y: 18 }}

@@ -126,4 +126,6 @@ Para cerrar mejor la base profesional, agregué un workflow de GitHub Actions qu
 
 Continué el refactor separando la pantalla de título y autenticación en `AuthScreen.jsx`. Esto reduce responsabilidad dentro del dashboard principal y deja una frontera más clara entre acceso/sesión y gameplay. Es un paso importante para que el proyecto sea más fácil de mantener y escalar sin convertir cada cambio visual en una edición dentro de un archivo gigante.
 
+También separé la Boss Arena en `BossArena.jsx` y agregué la forja manual de bosses. Ahora puedo crear un jefe propio con nombre, tipo, HP, recompensas y una lista de ataques/subtareas. Esto es clave para que LifeRPG no imponga proyectos genéricos: cada usuario puede convertir sus metas reales en jefes personalizados, y esos datos se guardan con su `user_id` en Supabase.
+
 El siguiente paso antes del deploy será ordenar el componente principal en módulos más pequeños, agregar tests mínimos de flujos críticos y terminar la configuración real de Supabase/Vercel. Recién cuando esa base esté sólida quiero publicar el deploy final, para que el link del portfolio muestre una experiencia pulida y confiable.
