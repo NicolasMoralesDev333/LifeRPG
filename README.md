@@ -36,6 +36,7 @@ LifeRPG es un tracker de hábitos gamificado con estética Dark/Neon RPG. La ide
 - Carga diferida de El Oráculo para evitar cargar Recharts en el bundle inicial.
 - Metadatos web, favicon SVG y manifest PWA básico para deploy.
 - Tests unitarios de reglas de XP, level up, logs y rachas con Vitest.
+- Pantalla de Auth separada del dashboard principal para mejorar mantenibilidad.
 
 ## Arquitectura de datos
 
@@ -108,6 +109,7 @@ npm run test:run
 - La vista de analíticas se carga con `React.lazy` para reducir el peso inicial del dashboard.
 - El HTML base incluye descripción, Open Graph, theme color y manifest para que el deploy no se vea genérico.
 - La lógica pura de progresión y analíticas vive en `src/lib/gameplay.js`, testeada con Vitest.
+- La pantalla de título/login vive en `src/components/AuthScreen.jsx`, separada del flujo de gameplay.
 - El Dungeon Master IA está mockeado, pero la UI ya espera un contrato JSON estructurado.
 
 ## Roadmap de producción

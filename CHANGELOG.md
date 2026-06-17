@@ -124,4 +124,6 @@ El siguiente ajuste fue separar lógica pura de gameplay en `src/lib/gameplay.js
 
 Para cerrar mejor la base profesional, agregué un workflow de GitHub Actions que ejecuta instalación limpia, tests unitarios y build de producción en cada push o pull request a `main`. Esto convierte la validación local en una garantía automática del repositorio.
 
+Continué el refactor separando la pantalla de título y autenticación en `AuthScreen.jsx`. Esto reduce responsabilidad dentro del dashboard principal y deja una frontera más clara entre acceso/sesión y gameplay. Es un paso importante para que el proyecto sea más fácil de mantener y escalar sin convertir cada cambio visual en una edición dentro de un archivo gigante.
+
 El siguiente paso antes del deploy será ordenar el componente principal en módulos más pequeños, agregar tests mínimos de flujos críticos y terminar la configuración real de Supabase/Vercel. Recién cuando esa base esté sólida quiero publicar el deploy final, para que el link del portfolio muestre una experiencia pulida y confiable.
