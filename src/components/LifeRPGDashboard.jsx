@@ -695,6 +695,7 @@ export default function LifeRPGDashboard() {
   const [player, setPlayer] = useState(INITIAL_PLAYER);
   const [habits, setHabits] = useState([]);
   const [bosses, setBosses] = useState(INITIAL_BOSSES);
+  const [selectedBossId, setSelectedBossId] = useState(INITIAL_BOSSES[0]?.id);
   const [blackMarketRewards, setBlackMarketRewards] = useState(INITIAL_REWARDS);
   const [activityLogs, setActivityLogs] = useState(() =>
     generateMockActivityLogs(DEMO_USER_ID),
@@ -724,7 +725,11 @@ export default function LifeRPGDashboard() {
   const totalPower = Object.values(stats).reduce((sum, value) => sum + value, 0);
   const selectedStat = findStatConfig(missionDraft.stat);
   const selectedDifficulty = findDifficultyConfig(missionDraft.difficulty);
-  const activeBoss = bosses.find((boss) => !boss.isDefeated) ?? null;
+  const selectedBoss = bosses.find((boss) => boss.id === selectedBossId);
+  const activeBoss =
+    selectedBoss && !selectedBoss.isDefeated
+      ? selectedBoss
+      : bosses.find((boss) => !boss.isDefeated) ?? null;
 
   const showToast = useCallback((message, type = "error") => {
     const toastId = createClientId("toast");
@@ -993,21 +998,26 @@ export default function LifeRPGDashboard() {
         setPlayer(nextPlayer);
         setHabits(remoteHabitRows.map(decorateHabit));
         setBlackMarketRewards(remoteRewardRows.map(decorateReward));
-        setBosses(
-          remoteBossRows.map((bossRow) =>
-            decorateBoss(
-              bossRow,
-              remoteSubtaskRows.filter(
-                (subtaskRow) => subtaskRow.boss_id === bossRow.id,
-              ),
+        const nextBosses = remoteBossRows.map((bossRow) =>
+          decorateBoss(
+            bossRow,
+            remoteSubtaskRows.filter(
+              (subtaskRow) => subtaskRow.boss_id === bossRow.id,
             ),
           ),
+        );
+
+        setBosses(nextBosses);
+        setSelectedBossId(
+          nextBosses.find((boss) => !boss.isDefeated)?.id ??
+            nextBosses[0]?.id,
         );
         setActivityLogs(remoteActivityRows.map(decorateActivityLog));
         setLastAction("Partida sincronizada");
       } catch {
         setPlayer(INITIAL_PLAYER);
         setHabits(INITIAL_HABITS);
+        setSelectedBossId(INITIAL_BOSSES[0]?.id);
         setBlackMarketRewards(INITIAL_REWARDS);
         setActivityLogs(generateMockActivityLogs("fallback-local"));
         setLastAction("Modo fallback local");
@@ -1020,6 +1030,18 @@ export default function LifeRPGDashboard() {
     },
     [showErrorToast],
   );
+
+  useEffect(() => {
+    const currentSelection = bosses.find((boss) => boss.id === selectedBossId);
+
+    if (currentSelection && !currentSelection.isDefeated) {
+      return;
+    }
+
+    const nextActiveBoss = bosses.find((boss) => !boss.isDefeated);
+
+    setSelectedBossId(nextActiveBoss?.id ?? bosses[0]?.id);
+  }, [bosses, selectedBossId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1060,6 +1082,7 @@ export default function LifeRPGDashboard() {
         setPlayer(INITIAL_PLAYER);
         setHabits([]);
         setBosses(INITIAL_BOSSES);
+        setSelectedBossId(INITIAL_BOSSES[0]?.id);
         setBlackMarketRewards(INITIAL_REWARDS);
         setActivityLogs(generateMockActivityLogs(DEMO_USER_ID));
         setDamageBursts([]);
@@ -1084,6 +1107,7 @@ export default function LifeRPGDashboard() {
       setPlayer(INITIAL_PLAYER);
       setHabits(INITIAL_HABITS);
       setBosses(INITIAL_BOSSES);
+      setSelectedBossId(INITIAL_BOSSES[0]?.id);
       setBlackMarketRewards(INITIAL_REWARDS);
       setActivityLogs(generateMockActivityLogs(DEMO_USER_ID));
       setDamageBursts([]);
@@ -1180,6 +1204,7 @@ export default function LifeRPGDashboard() {
       setPlayer(INITIAL_PLAYER);
       setHabits([]);
       setBosses(INITIAL_BOSSES);
+      setSelectedBossId(INITIAL_BOSSES[0]?.id);
       setBlackMarketRewards(INITIAL_REWARDS);
       setActivityLogs(generateMockActivityLogs(DEMO_USER_ID));
       setLastAction("Sistema offline");
@@ -1498,6 +1523,7 @@ export default function LifeRPGDashboard() {
     const aiBoss = createBossFromAIQuest(aiGeneratedQuest);
 
     setBosses((currentBosses) => [aiBoss, ...currentBosses]);
+    setSelectedBossId(aiBoss.id);
     appendActivityLog("ai", aiBoss.name);
     setLastAction(`Misión IA aceptada: ${aiBoss.name}`);
     showSuccessToast(`Boss invocado: ${aiBoss.name}`);
@@ -1554,6 +1580,7 @@ export default function LifeRPGDashboard() {
     };
 
     setBosses((currentBosses) => [newBoss, ...currentBosses]);
+    setSelectedBossId(newBoss.id);
     appendActivityLog("boss-forge", newBoss.name);
     setLastAction(`Boss forjado: ${newBoss.name}`);
     showSuccessToast(`Nuevo boss activo: ${newBoss.name}`);
@@ -2252,10 +2279,13 @@ export default function LifeRPGDashboard() {
 
         <BossArena
           activeBoss={activeBoss}
+          bosses={bosses}
           damageBursts={damageBursts}
           onAttack={handleBossAttack}
           onCreateBoss={handleCreateBoss}
           onOpenDungeonMaster={openDungeonMasterModal}
+          onSelectBoss={setSelectedBossId}
+          selectedBossId={activeBoss?.id ?? selectedBossId}
         />
 
         <motion.section

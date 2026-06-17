@@ -60,10 +60,13 @@ function parseBossDraft(draft) {
 
 export default function BossArena({
   activeBoss,
+  bosses = [],
   damageBursts,
   onAttack,
   onCreateBoss,
   onOpenDungeonMaster,
+  onSelectBoss,
+  selectedBossId,
 }) {
   const [isForgeBossOpen, setIsForgeBossOpen] = useState(false);
   const [bossDraft, setBossDraft] = useState(INITIAL_BOSS_DRAFT);
@@ -77,6 +80,8 @@ export default function BossArena({
   const SelectedTypeIcon =
     BOSS_TYPE_OPTIONS.find((option) => option.key === bossDraft.icon)?.Icon ??
     Skull;
+  const currentActiveId = activeBoss?.id ?? selectedBossId;
+  const activeBossCount = bosses.filter((boss) => !boss.isDefeated).length;
 
   const closeForgeBoss = () => {
     setIsForgeBossOpen(false);
@@ -114,6 +119,76 @@ export default function BossArena({
       >
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(225,29,72,0.24),transparent_34%),linear-gradient(135deg,rgba(127,29,29,0.28),transparent_34%,rgba(250,204,21,0.08)_78%,transparent)]" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-rose-600 via-red-500 to-yellow-200" />
+
+        {bosses.length > 0 && (
+          <div className="relative mb-5 border-2 border-rose-300/40 bg-slate-950/70 p-3 [clip-path:polygon(0_0,calc(100%-14px)_0,100%_14px,100%_100%,14px_100%,0_calc(100%-14px))]">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase text-rose-200">
+                  Boss Roster
+                </p>
+                <h3 className="text-lg font-black uppercase text-white">
+                  Objetivos del Jugador
+                </h3>
+              </div>
+              <span className="w-fit border border-yellow-200/60 bg-yellow-200/10 px-2 py-1 font-mono text-xs font-black uppercase text-yellow-100">
+                {activeBossCount} activos / {bosses.length} total
+              </span>
+            </div>
+
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {bosses.map((boss) => {
+                const BossIcon = boss.Icon ?? Skull;
+                const isSelected = boss.id === currentActiveId;
+                const hpPercent = Math.max(
+                  (boss.currentHp / boss.totalHp) * 100,
+                  0,
+                );
+
+                return (
+                  <button
+                    key={boss.id}
+                    type="button"
+                    disabled={boss.isDefeated}
+                    onClick={() => onSelectBoss?.(boss.id)}
+                    className={`group border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-yellow-200 focus:ring-offset-2 focus:ring-offset-slate-950 ${
+                      boss.isDefeated
+                        ? "cursor-not-allowed border-lime-300/40 bg-lime-300/10 text-lime-100 opacity-70"
+                        : isSelected
+                          ? "border-yellow-200 bg-yellow-200/10 text-yellow-100 shadow-[0_0_24px_rgba(250,204,21,0.18)]"
+                          : "border-rose-300/40 bg-rose-950/30 text-slate-200 hover:border-yellow-200/80 hover:bg-rose-900/50"
+                    }`}
+                  >
+                    <div className="mb-2 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-black uppercase">
+                          {boss.name}
+                        </p>
+                        <p className="font-mono text-[11px] font-black uppercase text-slate-400">
+                          {boss.isDefeated ? "CLEAR" : "TARGET"}
+                        </p>
+                      </div>
+                      <BossIcon className="h-5 w-5 shrink-0 text-rose-100 group-hover:text-yellow-100" />
+                    </div>
+                    <div className="h-2 overflow-hidden border border-rose-300/30 bg-slate-950">
+                      <div
+                        className={`h-full ${
+                          boss.isDefeated
+                            ? "bg-lime-300"
+                            : "bg-gradient-to-r from-red-500 via-rose-500 to-yellow-200"
+                        }`}
+                        style={{ width: `${hpPercent}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 font-mono text-[11px] font-black uppercase text-slate-300">
+                      HP {boss.currentHp}/{boss.totalHp}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {activeBoss ? (
           <div className="relative grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">

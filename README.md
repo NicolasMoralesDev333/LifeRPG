@@ -30,6 +30,7 @@ LifeRPG es un tracker de hábitos gamificado con estética Dark/Neon RPG. La ide
 - Mercado Negro para recompensas reales.
 - Boss Fights para proyectos largos con subtareas.
 - Forja manual de bosses personalizados por usuario.
+- Boss Roster para alternar entre varios jefes/proyectos activos.
 - Analíticas del jugador con radar chart y heatmap de actividad.
 - Dungeon Master IA mockeado para convertir metas en bosses jugables.
 - Persistencia Supabase para perfil, hábitos, recompensas, bosses, subtareas y logs.
@@ -39,6 +40,7 @@ LifeRPG es un tracker de hábitos gamificado con estética Dark/Neon RPG. La ide
 - Tests unitarios de reglas de XP, level up, logs y rachas con Vitest.
 - Pantalla de Auth separada del dashboard principal para mejorar mantenibilidad.
 - Boss Arena separada en `BossArena.jsx`, con creación manual de jefes y ataques.
+- Selección de boss activo con historial visual de jefes derrotados.
 
 ## Arquitectura de datos
 
@@ -113,6 +115,7 @@ npm run test:run
 - La lógica pura de progresión y analíticas vive en `src/lib/gameplay.js`, testeada con Vitest.
 - La pantalla de título/login vive en `src/components/AuthScreen.jsx`, separada del flujo de gameplay.
 - La Boss Arena vive en `src/components/BossArena.jsx`; el componente maneja la UI de combate y la forja manual, mientras el dashboard conserva la persistencia Supabase.
+- El dashboard mantiene `selectedBossId` para permitir múltiples bosses por jugador sin perder la sincronización por `user_id`.
 - El Dungeon Master IA está mockeado, pero la UI ya espera un contrato JSON estructurado.
 
 ## Roadmap de producción

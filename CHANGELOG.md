@@ -128,4 +128,6 @@ Continué el refactor separando la pantalla de título y autenticación en `Auth
 
 También separé la Boss Arena en `BossArena.jsx` y agregué la forja manual de bosses. Ahora puedo crear un jefe propio con nombre, tipo, HP, recompensas y una lista de ataques/subtareas. Esto es clave para que LifeRPG no imponga proyectos genéricos: cada usuario puede convertir sus metas reales en jefes personalizados, y esos datos se guardan con su `user_id` en Supabase.
 
+Después agregué el Boss Roster. Ya no dependo de un único jefe activo implícito: puedo ver todos mis bosses, distinguir cuáles siguen vivos, revisar los derrotados y seleccionar qué proyecto quiero atacar. Esta mejora hace que la app se acerque más a una gestión real de objetivos a largo plazo, donde cada usuario puede tener varias batallas abiertas al mismo tiempo.
+
 El siguiente paso antes del deploy será ordenar el componente principal en módulos más pequeños, agregar tests mínimos de flujos críticos y terminar la configuración real de Supabase/Vercel. Recién cuando esa base esté sólida quiero publicar el deploy final, para que el link del portfolio muestre una experiencia pulida y confiable.
